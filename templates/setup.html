@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>初始化账户 — 人员管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, Arial, sans-serif;
+            background: linear-gradient(135deg, #eef3ff 0%, #f5f6fa 60%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .card {
+            width: 100%; max-width: 400px;
+            background: #fff; border-radius: 14px; padding: 32px 30px 28px;
+            box-shadow: 0 10px 30px rgba(30, 64, 175, .08);
+            border: 1px solid #e8eaed;
+        }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        .brand-icon {
+            width: 42px; height: 42px; border-radius: 11px;
+            background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; box-shadow: 0 2px 8px rgba(37,99,235,.3);
+        }
+        .brand-name { font-size: 16px; font-weight: 700; color: #1a1d23; }
+        .brand-sub  { font-size: 12px; color: #9ba3af; }
+        .setup-hint {
+            font-size: 13px; color: #6b7280;
+            background: #f0f4ff; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 20px; margin-top: 16px;
+            border-left: 3px solid #2563eb;
+        }
+        .form-label { font-size: 13px; color: #444b58; font-weight: 500; }
+        .btn-primary { background: #2563eb; border-color: #2563eb; font-weight: 600; }
+        .btn-primary:hover { background: #1d4ed8; border-color: #1d4ed8; }
+        .flash-wrap { margin-bottom: 14px; }
+        .strength-bar { height: 4px; border-radius: 2px; margin-top: 6px; transition: width .2s, background .2s; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="brand">
+        <div class="brand-icon">👥</div>
+        <div>
+            <div class="brand-name">人员管理系统</div>
+            <div class="brand-sub">首次启动 · 初始化账户</div>
+        </div>
+    </div>
+
+    <div class="setup-hint">
+        首次使用请设置登录账户和密码，设置完成后将作为唯一管理员账户使用。
+    </div>
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} py-2 mb-2">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+    </div>
+
+    <form method="post" action="{{ url_for('auth.setup') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="mb-3">
+            <label class="form-label">账号</label>
+            <input type="text" name="username" class="form-control" autocomplete="username"
+                   required autofocus placeholder="请设置登录账号">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">密码 <span class="text-muted fw-normal">(至少 6 位)</span></label>
+            <input type="password" name="password" id="pwd" class="form-control"
+                   autocomplete="new-password" required placeholder="请设置密码">
+            <div class="strength-bar" id="strength-bar" style="width:0; background:#e5e7eb;"></div>
+        </div>
+        <div class="mb-4">
+            <label class="form-label">确认密码</label>
+            <input type="password" name="confirm_password" id="confirm" class="form-control"
+                   autocomplete="new-password" required placeholder="再次输入密码">
+            <div id="confirm-msg" style="font-size:12px; margin-top:4px; min-height:16px;"></div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">完成设置</button>
+    </form>
+</div>
+
+<script>
+const pwd     = document.getElementById('pwd');
+const confirm = document.getElementById('confirm');
+const bar     = document.getElementById('strength-bar');
+const msg     = document.getElementById('confirm-msg');
+
+pwd.addEventListener('input', function() {
+    const v = this.value;
+    const len = v.length;
+    let w = 0, color = '#e5e7eb';
+    if (len >= 6)  { w = 33; color = '#f59e0b'; }
+    if (len >= 10) { w = 66; color = '#3b82f6'; }
+    if (len >= 14 || /[^a-zA-Z0-9]/.test(v)) { w = 100; color = '#10b981'; }
+    bar.style.width   = w + '%';
+    bar.style.background = color;
+    checkConfirm();
+});
+
+confirm.addEventListener('input', checkConfirm);
+
+function checkConfirm() {
+    if (!confirm.value) { msg.textContent = ''; return; }
+    if (confirm.value === pwd.value) {
+        msg.style.color = '#10b981';
+        msg.textContent = '✓ 密码一致';
+    } else {
+        msg.style.color = '#ef4444';
+        msg.textContent = '✗ 两次密码不一致';
+    }
+}
+</script>
+</body>
+</html>

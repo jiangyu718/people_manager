@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% block title %}邮件配置{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-label { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .form-control, .form-select { font-size: 13px; }
+    .provider-card {
+        border: 2px solid #e5e7eb; border-radius: 8px; padding: 12px 16px;
+        cursor: pointer; transition: border-color .15s;
+    }
+    .provider-card.selected { border-color: #3b82f6; background: #eff6ff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>⚙️ 邮件配置</h5>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm p-4" style="max-width:560px;">
+        <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="provider" id="provider-val" value="{{ cfg.provider if cfg else 'custom' }}">
+
+            <div class="mb-3">
+                <label class="form-label">邮件服务商</label>
+                <div class="d-flex gap-3">
+                    <div class="provider-card flex-fill text-center" data-provider="qq" onclick="selectProvider('qq')">
+                        <div style="font-size:20px;">📧</div>
+                        <div style="font-size:13px; font-weight:600;">QQ 邮箱</div>
+                        <div style="font-size:11px; color:#6b7280;">@qq.com</div>
+                    </div>
+                    <div class="provider-card flex-fill text-center" data-provider="cmss" onclick="selectProvider('cmss')">
+                        <div style="font-size:20px;">🏢</div>
+                        <div style="font-size:13px; font-weight:600;">中国移动</div>
+                        <div style="font-size:11px; color:#6b7280;">@cmss.chinamobile.com</div>
+                    </div>
+                    <div class="provider-card flex-fill text-center" data-provider="custom" onclick="selectProvider('custom')">
+                        <div style="font-size:20px;">⚙️</div>
+                        <div style="font-size:13px; font-weight:600;">自定义</div>
+                        <div style="font-size:11px; color:#6b7280;">其他服务器</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">SMTP 服务器</label>
+                <input type="text" name="smtp_server" id="smtp-server" class="form-control"
+                       value="{{ cfg.smtp_server if cfg else '' }}" placeholder="如 smtp.qq.com">
+            </div>
+            <div class="row mb-3">
+                <div class="col-sm-6">
+                    <label class="form-label">端口</label>
+                    <input type="number" name="smtp_port" id="smtp-port" class="form-control"
+                           value="{{ cfg.smtp_port if cfg else 465 }}">
+                </div>
+                <div class="col-sm-6 d-flex align-items-end pb-1">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="use_ssl" value="1"
+                               id="use-ssl" {% if not cfg or cfg.use_ssl %}checked{% endif %}>
+                        <label class="form-check-label" for="use-ssl" style="font-size:13px;">使用 SSL 加密</label>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">发件人邮箱（用户名）</label>
+                <input type="text" name="username" id="username" class="form-control"
+                       value="{{ cfg.username if cfg else '' }}" placeholder="your@qq.com">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">密码 / 授权码</label>
+                <input type="password" name="password" id="password" class="form-control"
+                       value="{{ cfg.password if cfg else '' }}"
+                       placeholder="QQ邮箱请填写授权码，非登录密码">
+                <div class="form-text">QQ邮箱需在"设置→账户"中开启IMAP/SMTP并生成授权码</div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">发件人名称（选填）</label>
+                <input type="text" name="from_name" id="from-name" class="form-control"
+                       value="{{ cfg.from_name if cfg else '' }}" placeholder="如：人力资源部">
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">保存配置</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const presets = {{ presets | tojson }};
+const savedConfigs = {{ saved_configs | tojson }};
+const currentProvider = document.getElementById('provider-val').value;
+
+// 页面初始，除了“当前激活”卡片，给其余已有配置的服务商挂个小徽标，
+// 让用户知道切换过去也能看到自己保存过的信息。
+function markSavedBadges() {
+    document.querySelectorAll('.provider-card').forEach(card => {
+        const p = card.dataset.provider;
+        card.querySelectorAll('.saved-badge').forEach(b => b.remove());
+        if (savedConfigs[p]) {
+            const b = document.createElement('div');
+            b.className = 'saved-badge';
+            b.style.cssText = 'font-size:10px; color:#16a34a; margin-top:2px;';
+            b.textContent = '✓ 已保存';
+            card.appendChild(b);
+        }
+    });
+}
+
+function selectProvider(p, opts) {
+    opts = opts || {};
+    document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('selected'));
+    document.querySelector(`[data-provider="${p}"]`)?.classList.add('selected');
+    document.getElementById('provider-val').value = p;
+
+    // 切换到某个服务商时：优先回填该服务商"保存过的配置"；
+    // 没有时退回 preset；仍没有则清空（custom）。
+    // 若是页面首次初始化，不覆盖服务端渲染的字段值。
+    if (opts.keepCurrent) return;
+
+    const saved = savedConfigs[p];
+    if (saved) {
+        document.getElementById('smtp-server').value = saved.smtp_server || '';
+        document.getElementById('smtp-port').value = saved.smtp_port || 465;
+        document.getElementById('use-ssl').checked = !!saved.use_ssl;
+        document.getElementById('username').value = saved.username || '';
+        document.getElementById('password').value = saved.password || '';
+        document.getElementById('from-name').value = saved.from_name || '';
+    } else if (presets[p]) {
+        document.getElementById('smtp-server').value = presets[p].smtp_server;
+        document.getElementById('smtp-port').value = presets[p].smtp_port;
+        document.getElementById('use-ssl').checked = presets[p].use_ssl;
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('from-name').value = '';
+    } else {
+        // custom 且无保存值：清空让用户自己填
+        document.getElementById('smtp-server').value = '';
+        document.getElementById('smtp-port').value = 465;
+        document.getElementById('use-ssl').checked = true;
+        document.getElementById('username').value = '';
+        document.getElementById('password').value = '';
+        document.getElementById('from-name').value = '';
+    }
+}
+
+markSavedBadges();
+selectProvider(currentProvider, { keepCurrent: true });
+</script>
+{% endblock %}

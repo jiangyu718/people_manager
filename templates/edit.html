@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}编辑人员{% endblock %}
+
+{% block extra_css %}
+{% include '_personnel_form_css.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>✏️ 编辑人员</h5>
+</div>
+<div class="content-body">
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if form.errors %}
+    <div class="alert alert-danger py-2" style="max-width: 760px;">
+        <strong>表单校验失败：</strong>
+        <ul class="mb-0 mt-1 ps-3">
+            {% for field, errors in form.errors.items() %}
+                {% for error in errors %}
+                    <li>{{ form[field].label.text if form[field] else field }}：{{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-3 shadow-sm p-4" style="max-width: 760px;">
+        <form id="personnel-form" method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            {% include '_personnel_form_body.html' %}
+
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" class="btn btn-primary btn-lg">保存修改</button>
+                <a href="{{ url_for('personnel.list_view') }}" class="btn btn-outline-secondary btn-lg">取消</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% set prefill_dates = {
+    'property': property_date,
+    'remote_start': remote_date,
+    'remote_end': remote_end_date,
+    'work_loc': work_location_date,
+    'household_loc': household_location_date,
+    'spouse_loc': spouse_location_date,
+    'rank_date': rank_date,
+    'created_at': (personnel.created_at.strftime('%Y-%m-%d') if personnel.created_at else ''),
+} %}
+{% set prefill_has_property = form.has_property.data or '' %}
+{% include '_personnel_form_scripts.html' %}
+{% endblock %}

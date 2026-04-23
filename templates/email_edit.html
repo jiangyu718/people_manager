@@ -1,0 +1,418 @@
+{% extends 'base.html' %}
+{% block title %}{{ '编辑模板' if tpl else '新建模板' }}{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<style>
+    .form-label { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .form-control, .form-select, textarea { font-size: 13px; }
+    .macro-panel {
+        background: #f8faff; border: 1px solid #bfdbfe; border-radius: 8px;
+        padding: 14px; position: sticky; top: 20px;
+    }
+    .macro-panel h6 { font-size: 13px; font-weight: 700; color: #1e40af; margin-bottom: 10px; }
+    .macro-item {
+        display: flex; align-items: flex-start; gap: 8px;
+        padding: 6px 0; border-bottom: 1px solid #e8f0fe; font-size: 12px;
+    }
+    .macro-item:last-child { border-bottom: none; }
+    .macro-code {
+        font-family: monospace; background: #eff6ff; color: #1d4ed8;
+        padding: 1px 6px; border-radius: 4px; font-size: 12px;
+        cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    }
+    .macro-code:hover { background: #dbeafe; }
+    .macro-desc { color: #6b7280; line-height: 1.4; }
+    .att-item {
+        display: flex; align-items: center; gap: 8px; padding: 5px 0;
+        border-bottom: 1px solid #f3f4f6; font-size: 12px;
+    }
+    .att-item:last-child { border-bottom: none; }
+
+    /* Quill 编辑器样式 */
+    #quill-editor {
+        min-height: 260px;
+        font-size: 14px;
+        font-family: "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+    }
+    .ql-container.ql-snow {
+        border: 1px solid #ced4da;
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+    }
+    .ql-toolbar.ql-snow {
+        border: 1px solid #ced4da;
+        border-radius: 4px 4px 0 0;
+        background: #f8f9fa;
+    }
+    .ql-editor { line-height: 1.7; }
+    .ql-editor p { margin: 0 0 6px 0; }
+
+    /* ── 字体 picker（高特异性覆盖 Quill 默认 Sans Serif 等标签） ── */
+    .ql-snow .ql-picker.ql-font { width: 96px; }
+    .ql-snow .ql-picker.ql-font .ql-picker-label::before,
+    .ql-snow .ql-picker.ql-font .ql-picker-item::before { content: '默认字体'; }
+    .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="simsun"]::before,
+    .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="simsun"]::before {
+        content: '宋体'; font-family: SimSun, "宋体", serif;
+    }
+    .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="simhei"]::before,
+    .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="simhei"]::before {
+        content: '黑体'; font-family: SimHei, "黑体", sans-serif;
+    }
+    .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="kaiti"]::before,
+    .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="kaiti"]::before {
+        content: '楷体'; font-family: KaiTi, "楷体", serif;
+    }
+    .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="fangsong"]::before,
+    .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="fangsong"]::before {
+        content: '仿宋'; font-family: FangSong, "仿宋", STFangsong, serif;
+    }
+    .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="yahei"]::before,
+    .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="yahei"]::before {
+        content: '微软雅黑'; font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+    }
+    /* 字体 class → font-family（编辑器内展示所选字体） */
+    .ql-font-simsun   { font-family: SimSun, "宋体", serif; }
+    .ql-font-simhei   { font-family: SimHei, "黑体", sans-serif; }
+    .ql-font-kaiti    { font-family: KaiTi, "楷体", serif; }
+    .ql-font-fangsong { font-family: FangSong, "仿宋", STFangsong, serif; }
+    .ql-font-yahei    { font-family: "Microsoft YaHei", "微软雅黑", sans-serif; }
+
+    /* ── 字号 picker 标签覆盖 ── */
+    .ql-snow .ql-picker.ql-size { width: 72px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item::before { content: '默认字号'; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before { content: '12px'; font-size: 12px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before { content: '14px'; font-size: 14px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before { content: '16px'; font-size: 14px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before { content: '18px'; font-size: 14px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before { content: '20px'; font-size: 15px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before { content: '24px'; font-size: 16px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="28px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="28px"]::before { content: '28px'; font-size: 16px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="32px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="32px"]::before { content: '32px'; font-size: 17px; }
+    .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="36px"]::before,
+    .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="36px"]::before { content: '36px'; font-size: 18px; }
+
+    /* ── 首行缩进按钮 ── */
+    .ql-snow .ql-toolbar button.ql-first-line-indent,
+    .ql-snow.ql-toolbar button.ql-first-line-indent {
+        width: auto; padding: 0 6px; font-size: 12px; line-height: 24px; color: #444;
+    }
+    .ql-snow .ql-toolbar button.ql-first-line-indent::before,
+    .ql-snow.ql-toolbar button.ql-first-line-indent::before { content: '首行缩进'; }
+    .ql-snow .ql-toolbar button.ql-first-line-indent.ql-active,
+    .ql-snow.ql-toolbar button.ql-first-line-indent.ql-active { color: #06c; }
+    .ql-editor p[style*="text-indent"] { padding-left: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>{{ '✏️ 编辑模板' if tpl else '➕ 新建模板' }}</h5>
+    <a href="{{ url_for('email.templates') }}" class="btn btn-outline-secondary btn-sm">← 返回列表</a>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="row g-4">
+        <!-- 左侧：表单 -->
+        <div class="col-lg-8">
+            <div class="bg-white rounded-3 shadow-sm p-4">
+                <form method="POST" enctype="multipart/form-data" id="template-form">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    <div class="mb-3">
+                        <label class="form-label">模板名称 <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control"
+                               value="{{ tpl.name if tpl else '' }}" required maxlength="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">邮件主题 <span class="text-danger">*</span></label>
+                        <input type="text" name="subject" id="subject-input" class="form-control"
+                               value="{{ tpl.subject if tpl else '' }}" required maxlength="200"
+                               placeholder="支持宏变量，如：{{ '{{姓名}}' }} 您好">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6">
+                            <label class="form-label">抄送（CC）</label>
+                            <input type="text" name="cc" class="form-control"
+                                   value="{{ tpl.cc if tpl else '' }}" placeholder="多个用逗号分隔">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">密送（BCC）</label>
+                            <input type="text" name="bcc" class="form-control"
+                                   value="{{ tpl.bcc if tpl else '' }}" placeholder="多个用逗号分隔">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">邮件正文 <span class="text-danger">*</span></label>
+                        <div class="form-text mb-1">支持富文本格式和宏变量（点击右侧宏可插入到光标处）</div>
+                        <!-- Quill 工具栏和编辑区 -->
+                        <div id="quill-editor"></div>
+                        <!-- 隐藏 textarea，提交时同步 Quill HTML 内容 -->
+                        <textarea name="body" id="body-input" style="display:none;">{{ tpl.body if tpl else '' }}</textarea>
+                    </div>
+
+                    {% if tpl and tpl.attachments %}
+                    <div class="mb-3 email-att-list">
+                        <label class="form-label">当前附件</label>
+                        <div class="border rounded p-2">
+                            {% for att in tpl.attachments %}
+                            <div class="att-item email-att-row" data-att-id="{{ att.id }}">
+                                <span style="flex:1; word-break:break-all;">📎 {{ att.filename }}</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                                        onclick="deleteEmailAttachment({{ att.id }}, this)">删除</button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <label class="form-label">添加附件</label>
+                        <input type="file" name="attachments" class="form-control" multiple>
+                        <div class="form-text">可选，支持多个文件（保存后生效）</div>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">保存模板</button>
+                        <a href="{{ url_for('email.templates') }}" class="btn btn-outline-secondary">取消</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 右侧：宏说明 -->
+        <div class="col-lg-4">
+            <div class="macro-panel">
+                <h6>📌 可用宏变量</h6>
+                <p style="font-size:11px; color:#6b7280; margin-bottom:10px;">
+                    点击宏名称可插入到当前光标位置（主题或正文）
+                </p>
+                {% for macro, desc in macros %}
+                <div class="macro-item">
+                    <span class="macro-code"
+                          onmousedown="event.preventDefault()"
+                          onclick="insertMacro('{{ macro }}')">{{ macro }}</span>
+                    <span class="macro-desc">{{ desc }}</span>
+                </div>
+                {% endfor %}
+                <div class="mt-3 pt-3" style="border-top:1px solid #bfdbfe;">
+                    <p style="font-size:11px; color:#6b7280; margin:0;">
+                        宏会在发送时自动替换为每位收件人的实际信息，实现个性化邮件。
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+const FONT_WHITELIST = ['simsun', 'simhei', 'kaiti', 'fangsong', 'yahei'];
+const FONT_FAMILY_MAP = {
+    simsun:   'SimSun, "宋体", serif',
+    simhei:   'SimHei, "黑体", sans-serif',
+    kaiti:    'KaiTi, "楷体", serif',
+    fangsong: 'FangSong, "仿宋", STFangsong, serif',
+    yahei:    '"Microsoft YaHei", "微软雅黑", sans-serif',
+};
+
+// ── 字体注册 ──
+const Font = Quill.import('formats/font');
+Font.whitelist = FONT_WHITELIST;
+Quill.register(Font, true);
+
+// ── 字号注册 ──
+const Size = Quill.import('attributors/style/size');
+Size.whitelist = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '36px'];
+Quill.register(Size, true);
+
+// ── 首行缩进注册 ──
+const Parchment = Quill.import('parchment');
+const FirstLineIndent = new Parchment.Attributor.Style(
+    'first-line-indent', 'text-indent',
+    { scope: Parchment.Scope.BLOCK, whitelist: ['2em'] }
+);
+Quill.register(FirstLineIndent, true);
+
+// ── 初始化 Quill ──
+const quill = new Quill('#quill-editor', {
+    theme: 'snow',
+    modules: {
+        toolbar: {
+            container: [
+                [{ 'font': FONT_WHITELIST }],
+                [{ 'size': Size.whitelist }],
+                ['bold', 'italic', 'underline'],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'align': [] }],
+                [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                ['first-line-indent'],
+                ['clean'],
+            ],
+            handlers: {
+                'first-line-indent': function() {
+                    const range = this.quill.getSelection(true);
+                    if (!range) return;
+                    const cur = this.quill.getFormat(range)['first-line-indent'];
+                    this.quill.format('first-line-indent', cur === '2em' ? false : '2em',
+                                      Quill.sources.USER);
+                    syncFirstLineBtn();
+                },
+            },
+        },
+    },
+    placeholder: '在此输入邮件正文，支持富文本格式...',
+});
+
+// ── 首行缩进按钮 active 状态 ──
+const firstLineBtn = quill.getModule('toolbar').container.querySelector('.ql-first-line-indent');
+if (firstLineBtn) firstLineBtn.title = '首行缩进（2字符）';
+function syncFirstLineBtn() {
+    if (!firstLineBtn) return;
+    const range = quill.getSelection();
+    if (!range) return;
+    const fmt = quill.getFormat(range);
+    firstLineBtn.classList.toggle('ql-active', fmt['first-line-indent'] === '2em');
+}
+quill.on('selection-change', syncFirstLineBtn);
+quill.on('editor-change', syncFirstLineBtn);
+
+// ── HTML ↔ 字体 class / inline style 互转 ──
+function inlineFontClasses(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+    FONT_WHITELIST.forEach(key => {
+        const cls = 'ql-font-' + key;
+        tmp.querySelectorAll('.' + cls).forEach(el => {
+            el.style.fontFamily = FONT_FAMILY_MAP[key];
+            el.classList.remove(cls);
+            if (!el.classList.length) el.removeAttribute('class');
+        });
+    });
+    return tmp.innerHTML;
+}
+function restoreFontClasses(html) {
+    if (!html) return html;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    tmp.querySelectorAll('[style*="font-family"]').forEach(el => {
+        const ff = (el.style.fontFamily || '').toLowerCase();
+        for (const key of FONT_WHITELIST) {
+            const fam = FONT_FAMILY_MAP[key].toLowerCase();
+            const firstName = fam.split(',')[0].replace(/["']/g, '').trim();
+            if (ff.includes(firstName)) {
+                el.classList.add('ql-font-' + key);
+                el.style.removeProperty('font-family');
+                if (!el.getAttribute('style')) el.removeAttribute('style');
+                break;
+            }
+        }
+    });
+    return tmp.innerHTML;
+}
+
+// ── 加载现有内容 ──
+const existingBody = document.getElementById('body-input').value;
+if (existingBody && existingBody.trim()) {
+    quill.clipboard.dangerouslyPasteHTML(restoreFontClasses(existingBody));
+}
+
+// ── 焦点 / 光标位置跟踪（点宏时焦点会转移，必须提前把位置记下来）──
+let lastFocused = 'quill';
+let lastQuillRange = null;
+const subjectEl = document.getElementById('subject-input');
+let lastSubjectCursor = { start: subjectEl.value.length, end: subjectEl.value.length };
+
+function saveSubjectCursor() {
+    if (document.activeElement === subjectEl) {
+        lastSubjectCursor = {
+            start: subjectEl.selectionStart ?? subjectEl.value.length,
+            end: subjectEl.selectionEnd ?? subjectEl.value.length,
+        };
+    }
+}
+subjectEl.addEventListener('focus', () => { lastFocused = 'subject'; saveSubjectCursor(); });
+subjectEl.addEventListener('click', saveSubjectCursor);
+subjectEl.addEventListener('keyup', saveSubjectCursor);
+subjectEl.addEventListener('select', saveSubjectCursor);
+
+quill.root.addEventListener('focus', () => { lastFocused = 'quill'; });
+quill.on('selection-change', (range) => { if (range) lastQuillRange = range; });
+
+// ── 宏插入 ──
+function insertMacro(macro) {
+    if (lastFocused === 'subject') {
+        const { start, end } = lastSubjectCursor;
+        subjectEl.value = subjectEl.value.substring(0, start) + macro + subjectEl.value.substring(end);
+        const newPos = start + macro.length;
+        subjectEl.focus();
+        subjectEl.setSelectionRange(newPos, newPos);
+        lastSubjectCursor = { start: newPos, end: newPos };
+    } else {
+        const idx = lastQuillRange ? lastQuillRange.index : Math.max(0, quill.getLength() - 1);
+        quill.insertText(idx, macro, Quill.sources.USER);
+        const newIdx = idx + macro.length;
+        quill.setSelection(newIdx, Quill.sources.USER);
+        lastQuillRange = { index: newIdx, length: 0 };
+        quill.focus();
+    }
+}
+
+// ── 提交前把 Quill 内容同步到隐藏 textarea，并做非空校验 ──
+document.getElementById('template-form').addEventListener('submit', function(e) {
+    if (!quill.getText().trim()) {
+        e.preventDefault();
+        alert('邮件正文不能为空');
+        quill.focus();
+        return false;
+    }
+    document.getElementById('body-input').value = inlineFontClasses(quill.root.innerHTML);
+});
+
+// ── 删除邮件模板附件 ──
+async function deleteEmailAttachment(attId, btn) {
+    if (!confirm('删除该附件？')) return;
+    btn.disabled = true;
+    try {
+        const resp = await fetch('/attachment/' + attId + '/delete', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}',
+                'X-Requested-With': 'fetch',
+                'Accept': 'application/json',
+            },
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const row = btn.closest('.email-att-row');
+        const list = btn.closest('.email-att-list');
+        if (row) row.remove();
+        if (list && list.querySelectorAll('.email-att-row').length === 0) list.remove();
+    } catch (e) {
+        alert('删除失败：' + e.message);
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

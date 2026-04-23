@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}历史记录{% endblock %}
+
+{% block extra_css %}
+<style>
+    th { font-size: 12px; }
+    td { font-size: 12px; white-space: nowrap; }
+    .empty-wrap { padding: 60px 20px; text-align: center; color: #9ca3af; }
+    .empty-wrap .emoji { font-size: 42px; margin-bottom: 10px; }
+    .badge-pending  { background:#fef3c7; color:#92400e; }
+    .badge-approved { background:#d1fae5; color:#065f46; }
+    .badge-rejected { background:#fee2e2; color:#991b1b; }
+    .badge-deleted  { background:#f3f4f6; color:#6b7280; }
+    .status-badge {
+        display: inline-block; padding: 2px 8px; border-radius: 12px;
+        font-size: 11px; font-weight: 500; white-space: nowrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>📋 历史记录</h5>
+    <span class="text-muted ms-1" style="font-size:13px;">所有进入系统的记录汇总。审核未通过或已删除的记录可恢复或移入垃圾桶。</span>
+</div>
+<div class="content-body">
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if personnels %}
+    {% set status_map = {'pending': ('待审核','badge-pending'), 'approved': ('正常','badge-approved'), 'rejected': ('审核未通过','badge-rejected'), 'deleted': ('删除','badge-deleted')} %}
+    <div class="table-responsive bg-white rounded-3 shadow-sm">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>状态</th>
+                    <th>人员类型</th>
+                    <th>员工编号</th>
+                    <th>姓名</th>
+                    <th>职级</th>
+                    <th>工作所在地</th>
+                    <th>户口所在地</th>
+                    <th>配偶常住地</th>
+                    <th>子女常住地</th>
+                    <th>是否购房</th>
+                    <th>房产交付日期</th>
+                    <th>附件</th>
+                    <th>异地开始时间</th>
+                    <th>异地结束时间</th>
+                    <th>提交时间</th>
+                    <th>类型</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in personnels %}
+                {% set label, badge_cls = status_map.get(p.status, (p.status, 'badge-deleted')) %}
+                <tr>
+                    <td><span class="status-badge {{ badge_cls }}">{{ label }}</span></td>
+                    <td>{{ p.personnel_type }}</td>
+                    <td>{{ p.employee_id }}</td>
+                    <td>{{ p.name }}</td>
+                    <td>{{ p.rank if p.rank is not none else '-' }}</td>
+                    <td>{{ p.work_location }}</td>
+                    <td>{{ p.household_location }}</td>
+                    <td>{{ p.spouse_location or '-' }}</td>
+                    <td>{{ p.children_location or '-' }}</td>
+                    <td>{{ p.has_property }}</td>
+                    <td>{{ p.property_delivery_date or '-' }}</td>
+                    <td>
+                        {% if p.attachments %}
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    {{ p.attachments|length }}个文件
+                                </button>
+                                <ul class="dropdown-menu">
+                                    {% for att in p.attachments %}
+                                        <li><a class="dropdown-item" href="{{ url_for('public.get_file', file_id=att.id) }}" target="_blank">{{ att.filename }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ p.remote_start_date or '-' }}</td>
+                    <td>{{ p.remote_end_date or '-' }}</td>
+                    <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M:%S') if p.created_at else '-' }}</td>
+                    <td>
+                        {% if p.is_no_change %}
+                            <span class="status-badge" style="background:#e0e7ff; color:#3730a3;">无修改确认</span>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if p.status in ('rejected', 'deleted') %}
+                        <form method="POST" action="{{ url_for('personnel.history_restore', id=p.id) }}" style="display:inline;"
+                              onsubmit="return confirm('确认恢复该记录到异地情况记录？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-success py-0 px-2">恢复</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('personnel.history_delete', id=p.id) }}" style="display:inline;"
+                              onsubmit="return confirm('确认移入垃圾桶？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger py-0 px-2">删除</button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted" style="font-size:11px;">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-3 shadow-sm empty-wrap">
+        <div class="emoji">📋</div>
+        <div>暂无记录</div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

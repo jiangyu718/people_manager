@@ -1,0 +1,43 @@
+[Unit]
+Description=CMSS People Management System
+After=network.target
+
+[Service]
+# ── 运行账号（建议 non-root） ────────────────────────
+User=www-data
+Group=www-data
+
+# ── 部署路径：改成你实际的安装目录 ───────────────────
+WorkingDirectory=/opt/cmss_people
+
+# ── 敏感配置通过环境变量注入（不要写进代码） ─────────
+Environment="FLASK_SECRET_KEY=change-me-to-a-long-random-string"
+Environment="DATABASE_URL=sqlite:///personnel.db"
+
+# ── 生产模式：gunicorn 单 worker（APScheduler 要求） ──
+# 如果没装 gunicorn，可以改成下面"开发模式"行
+ExecStart=/opt/cmss_people/.venv/bin/gunicorn \
+    --workers 1 \
+    --bind 0.0.0.0:5000 \
+    --access-logfile - \
+    --error-logfile - \
+    --timeout 60 \
+    wsgi:app
+
+# 开发模式替代（直接用 Flask dev server，不推荐生产）：
+# ExecStart=/opt/cmss_people/.venv/bin/python main.py
+
+# ── 进程管理 ────────────────────────────────────────
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# ── 安全加固（可选） ────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/cmss_people
+
+[Install]
+WantedBy=multi-user.target

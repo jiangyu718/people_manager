@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+{% block title %}首页 — 人员管理系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        background: #fff; border-radius: 12px; padding: 20px 22px;
+        display: flex; align-items: center; gap: 16px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid #e8eaed;
+        text-decoration: none; color: inherit; transition: box-shadow .15s, transform .12s;
+    }
+    .stat-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.1); transform: translateY(-2px); color: inherit; text-decoration: none; }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .stat-icon.blue { background: #eff6ff; }
+    .stat-icon.amber { background: #fffbeb; }
+    .stat-icon.green { background: #f0fdf4; }
+    .stat-icon.gray { background: #f9fafb; }
+    .stat-val { font-size: 28px; font-weight: 700; color: #1a1d23; line-height: 1.1; }
+    .stat-label { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .quick-card {
+        background: #fff; border-radius: 12px; padding: 18px 20px;
+        border: 1px solid #e8eaed; text-decoration: none; color: #374151;
+        display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500;
+        transition: background .12s, box-shadow .12s;
+    }
+    .quick-card:hover { background: #f0f4ff; color: #1d4ed8; text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+    .quick-card .qi { font-size: 20px; }
+    .section-title { font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>🏠 概览</h5>
+</div>
+<div class="content-body">
+
+    <!-- Stats -->
+    <div class="section-title">数据概况</div>
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <a href="{{ url_for('personnel.list_view') }}" class="stat-card">
+                <div class="stat-icon blue">👤</div>
+                <div>
+                    <div class="stat-val">{{ total }}</div>
+                    <div class="stat-label">人员总数</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a href="{{ url_for('personnel.review') }}" class="stat-card">
+                <div class="stat-icon amber">⏳</div>
+                <div>
+                    <div class="stat-val">{{ pending }}</div>
+                    <div class="stat-label">待审核</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a href="{{ url_for('personnel.history') }}" class="stat-card">
+                <div class="stat-icon green">📝</div>
+                <div>
+                    <div class="stat-val">{{ history_count }}</div>
+                    <div class="stat-label">历史记录</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a href="{{ url_for('personnel.trash') }}" class="stat-card">
+                <div class="stat-icon gray">🗑️</div>
+                <div>
+                    <div class="stat-val">{{ trash_count }}</div>
+                    <div class="stat-label">回收站</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="section-title">快捷操作</div>
+    <div class="row g-2">
+        <div class="col-12 col-sm-6 col-lg-4">
+            <a href="{{ url_for('personnel.list_view') }}" class="quick-card">
+                <span class="qi">📋</span>查看人员列表
+            </a>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+            <a href="{{ url_for('personnel.add') }}" class="quick-card">
+                <span class="qi">➕</span>添加新人员
+            </a>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+            <a href="{{ url_for('personnel.import_upload') }}" class="quick-card">
+                <span class="qi">📥</span>导入 Excel / CSV
+            </a>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+            <a href="{{ url_for('public.generate_form') }}" class="quick-card">
+                <span class="qi">🔗</span>生成外部填写链接
+            </a>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+            <a href="{{ url_for('personnel.history') }}" class="quick-card">
+                <span class="qi">📝</span>查看历史记录
+            </a>
+        </div>
+        <div class="col-12 col-sm-6 col-lg-4">
+            <a href="{{ url_for('personnel.trash') }}" class="quick-card">
+                <span class="qi">🗑️</span>查看垃圾桶
+            </a>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

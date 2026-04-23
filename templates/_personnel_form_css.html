@@ -1,0 +1,63 @@
+{# 人员异地记录表单 — 添加/编辑 共享 CSS。#}
+<style>
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+    .form-label { font-weight: 600; font-size: 15px; margin-bottom: 5px; }
+    .form-control, .form-select { font-size: 13px; }
+    .form-section { margin-bottom: 18px; }
+
+    .date-picker-container { position: relative; }
+    .date-display-input { cursor: pointer; background: white !important; padding-right: 1.8rem; }
+    .cal-clear-x {
+        display: none; position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+        background: none; border: none; cursor: pointer; color: #9ca3af;
+        font-size: 18px; line-height: 1; padding: 0 3px; z-index: 2;
+    }
+    .cal-clear-x:hover { color: #6b7280; }
+    .cal-clear-x.visible { display: block; }
+    .calendar-popup {
+        display: none; position: absolute; top: calc(100% + 4px); left: 0;
+        background: white; border: 1px solid #ddd; border-radius: 8px;
+        box-shadow: 0 4px 20px rgba(0,0,0,.15); z-index: 1000; width: 300px;
+        user-select: none;
+    }
+    .calendar-popup.open { display: block; }
+    .cal-header { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid #eee; }
+    .cal-nav-group { display: flex; flex-shrink: 0; }
+    .cal-nav-btn { background: none; border: none; cursor: pointer; color: #555; font-size: 15px; padding: 4px 7px; border-radius: 4px; line-height: 1; }
+    .cal-nav-btn:hover { background: #f0f0f0; }
+    .cal-title { flex: 1; text-align: center; font-weight: 600; color: #1d4ed8; font-size: 14px; }
+    .cal-title-btn { cursor: pointer; }
+    .cal-title-btn:hover { text-decoration: underline; }
+    .cal-weekdays { display: grid; grid-template-columns: repeat(7,1fr); padding: 8px 8px 0; }
+    .cal-weekday { text-align: center; font-size: 12px; color: #999; padding: 4px 0; }
+    .cal-days { display: grid; padding: 4px 8px 8px; gap: 4px; }
+    .cal-day { text-align: center; padding: 7px 2px; font-size: 13px; cursor: pointer; border-radius: 50%; line-height: 1.4; }
+    .cal-day.wide { border-radius: 6px; padding: 11px 4px; font-size: 13px; }
+    .cal-day:hover:not(.other-month) { background: #dbeafe; }
+    .cal-day.today { color: #1d4ed8; font-weight: 700; }
+    .cal-day.wide.today { background: #dbeafe; color: #1d4ed8; font-weight: 600; }
+    .cal-day.selected { background: #3b82f6 !important; color: white !important; font-weight: normal; }
+    .cal-day.other-month { color: #ccc; cursor: default; }
+    .cal-footer { display: flex; align-items: center; padding: 8px 10px; border-top: 1px solid #eee; gap: 6px; }
+    .cal-date-display { flex: 1; font-size: 13px; color: #555; }
+    .cal-btn { background: none; border: 1px solid #ddd; border-radius: 4px; padding: 3px 9px; font-size: 12px; cursor: pointer; color: #555; }
+    .cal-btn:hover { background: #f5f5f5; }
+    .cal-btn.confirm { background: #3b82f6; color: white; border-color: #3b82f6; }
+    .cal-btn.confirm:hover { background: #2563eb; }
+    .loc-clear-btn {
+        background: none; border: none; color: #9ca3af; font-size: 12px;
+        cursor: pointer; padding: 2px 0; margin-top: 4px; text-decoration: underline;
+    }
+    .loc-clear-btn:hover { color: #6b7280; }
+    .required-star { color: #dc3545; font-weight: 700; margin-right: 2px; }
+    @keyframes flash-field {
+        0%   { box-shadow: none; background-color: transparent; }
+        20%  { box-shadow: 0 0 0 3px rgba(220,53,69,.45); background-color: rgba(220,53,69,.06); }
+        55%  { box-shadow: 0 0 0 3px rgba(220,53,69,.45); background-color: rgba(220,53,69,.06); }
+        100% { box-shadow: none; background-color: transparent; }
+    }
+    .field-flash { animation: flash-field 1.2s ease !important; border-radius: 6px; }
+</style>

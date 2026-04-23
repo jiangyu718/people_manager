@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+{% block title %}员工管理{% endblock %}
+
+{% block extra_css %}
+<style>
+    th { font-size: 12px; }
+    td { font-size: 12px; white-space: nowrap; }
+    .empty-wrap { padding: 60px 20px; text-align: center; color: #9ca3af; }
+    .empty-wrap .emoji { font-size: 42px; margin-bottom: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>👤 员工管理</h5>
+    <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">+ 添加员工</button>
+    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">📥 导入</button>
+    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#defaultEmailModal" onclick="prepareDefaultEmailModal()">📧 默认邮箱</button>
+    <div class="btn-group btn-group-sm">
+        <a href="{{ url_for('employee.export', format='xlsx') }}" class="btn btn-outline-success">⬇ Excel</a>
+        <a href="{{ url_for('employee.export', format='csv') }}" class="btn btn-outline-secondary">⬇ CSV</a>
+    </div>
+    <button class="btn btn-primary btn-sm" id="send-email-btn" style="display:none;" onclick="openSendModal()">✉ 发送邮件</button>
+    <button class="btn btn-danger btn-sm" id="bulk-delete-btn" style="display:none;" onclick="openBulkDeleteModal()">🗑 批量删除</button>
+    <span class="text-muted ms-1" id="sel-count" style="font-size:12px;"></span>
+</div>
+<div class="content-body">
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if employees %}
+    <div class="d-flex gap-2 mb-2 align-items-center">
+        <label style="font-size:12px; cursor:pointer;">
+            <input type="checkbox" id="select-all"> 全选/取消
+        </label>
+    </div>
+    <div class="table-responsive bg-white rounded-3 shadow-sm">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:36px;"></th>
+                    <th>员工编号</th>
+                    <th>姓名</th>
+                    <th>邮箱</th>
+                    <th>录入时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in employees %}
+                <tr>
+                    <td><input type="checkbox" class="emp-cb" value="{{ e.employee_id }}"></td>
+                    <td><strong>{{ e.employee_id }}</strong></td>
+                    <td>{{ e.name }}</td>
+                    <td>{{ e.email or '-' }}</td>
+                    <td>{{ e.created_at.strftime('%Y-%m-%d') if e.created_at else '-' }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary py-0 px-2"
+                            onclick="openEdit('{{ e.employee_id }}','{{ e.name }}','{{ e.email or '' }}')">编辑</button>
+                        <form method="POST" action="{{ url_for('employee.delete', employee_id=e.employee_id) }}"
+                              style="display:inline;"
+                              onsubmit="return confirm('确定删除员工 {{ e.name }}？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger py-0 px-2">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-3 shadow-sm empty-wrap">
+        <div class="emoji">👤</div>
+        <div>暂无员工记录</div>
+        <button class="btn btn-primary btn-sm mt-3" data-bs-toggle="modal" data-bs-target="#addModal">添加第一位员工</button>
+    </div>
+    {% endif %}
+</div>
+
+<!-- 添加员工 Modal -->
+<div class="modal fade" id="addModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h6 class="modal-title">添加员工</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('employee.add') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-500" style="font-size:13px;">员工编号 <span class="text-danger">*</span></label>
+                        <input type="text" name="employee_id" class="form-control form-control-sm" required maxlength="20">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">姓名 <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control form-control-sm" required maxlength="50">
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label" style="font-size:13px;">邮箱</label>
+                        <input type="email" name="email" class="form-control form-control-sm" maxlength="100">
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑员工 Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h6 class="modal-title">编辑员工</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="edit-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">员工编号</label>
+                        <input type="text" id="edit-emp-id" class="form-control form-control-sm" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">姓名 <span class="text-danger">*</span></label>
+                        <input type="text" name="name" id="edit-name" class="form-control form-control-sm" required maxlength="50">
+                    </div>
+                    <div class="mb-1">
+                        <label class="form-label" style="font-size:13px;">邮箱</label>
+                        <input type="email" name="email" id="edit-email" class="form-control form-control-sm" maxlength="100">
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 导入员工 Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h6 class="modal-title">导入员工</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('employee.import_employees') }}" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">选择文件（xlsx / csv）</label>
+                        <input type="file" name="file" class="form-control form-control-sm" accept=".csv,.xlsx" required>
+                    </div>
+                    <div class="p-2 bg-light rounded" style="font-size:12px; color:#6b7280;">
+                        列名：员工编号、姓名、邮箱<br>
+                        员工编号已存在则跳过（不覆盖）。
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">开始导入</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 默认邮箱 Modal -->
+<div class="modal fade" id="defaultEmailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h6 class="modal-title">填充默认邮箱</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('employee.fill_default_email') }}" id="default-email-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div id="default-email-ids"></div>
+                <div class="modal-body">
+                    <p class="text-muted mb-2" style="font-size:12px;">
+                        默认邮箱格式：<code>姓名拼音@cmss.chinamobile.com</code><br>
+                        已有邮箱的员工不会被修改。
+                    </p>
+                    <div class="mb-2">
+                        <label class="d-block p-2 border rounded mb-2" style="cursor:pointer; font-size:13px;">
+                            <input type="radio" name="scope" value="missing" checked>
+                            <span class="fw-bold ms-1">为所有缺失邮箱的员工填充</span>
+                            <div class="text-muted mt-1 ms-4" id="scope-all-count"></div>
+                        </label>
+                        <label class="d-block p-2 border rounded" style="cursor:pointer; font-size:13px;" id="scope-selected-label">
+                            <input type="radio" name="scope" value="selected" id="scope-selected-radio">
+                            <span class="fw-bold ms-1">仅为已选中的员工填充（跳过已有邮箱）</span>
+                            <div class="text-muted mt-1 ms-4" id="scope-selected-count">未选择任何员工</div>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm" id="default-email-submit">确认填充</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 批量删除确认 Modal -->
+<div class="modal fade" id="bulkDeleteModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h6 class="modal-title text-danger">批量删除员工</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('employee.bulk_delete') }}" id="bulk-delete-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div id="bulk-delete-ids"></div>
+                <div class="modal-body">
+                    <div class="alert alert-danger py-2 mb-2" style="font-size:13px;">
+                        即将删除以下 <strong id="bulk-delete-count">0</strong> 位员工，此操作不可恢复！
+                    </div>
+                    <div id="bulk-delete-names" class="p-2 bg-light rounded" style="font-size:12px; max-height:120px; overflow-y:auto;"></div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-danger btn-sm">确认删除</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 发送邮件 Modal -->
+<div class="modal fade" id="sendEmailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h6 class="modal-title">发送邮件</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('email.send') }}" id="send-email-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div id="hidden-employee-ids"></div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">已选员工</label>
+                        <div id="selected-names" class="p-2 bg-light rounded" style="font-size:12px; max-height:100px; overflow-y:auto;"></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" style="font-size:13px;">选择邮件模板 <span class="text-danger">*</span></label>
+                        <select name="template_id" class="form-select form-select-sm" required id="template-select">
+                            <option value="">-- 请选择模板 --</option>
+                            {% for tpl in email_templates_list %}
+                            <option value="{{ tpl.id }}">{{ tpl.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="template-preview" class="p-2 bg-light rounded" style="font-size:12px; display:none;">
+                        <div><strong>主题：</strong><span id="preview-subject"></span></div>
+                        <div class="mt-1"><strong>抄送：</strong><span id="preview-cc"></span></div>
+                    </div>
+                    <p class="text-muted mt-2 mb-0" style="font-size:12px;">确认后将逐一发送个性化邮件，发送过程中请勿关闭页面。</p>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary btn-sm">确认发送</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── 邮件模板预览数据 ──
+const templateData = {
+    {% for tpl in email_templates_list %}
+    {{ tpl.id }}: { subject: {{ tpl.subject | tojson }}, cc: {{ (tpl.cc or '') | tojson }} },
+    {% endfor %}
+};
+
+// ── 默认邮箱弹窗 ──
+function prepareDefaultEmailModal() {
+    const rows = Array.from(document.querySelectorAll('tbody tr'));
+    const missingRows = rows.filter(r => r.cells[3].textContent.trim() === '-');
+    const checkedRows = rows.filter(r => r.querySelector('.emp-cb')?.checked);
+    const checkedMissing = checkedRows.filter(r => r.cells[3].textContent.trim() === '-');
+
+    document.getElementById('scope-all-count').textContent =
+        `当前缺失邮箱 ${missingRows.length} 人`;
+    const selCountEl = document.getElementById('scope-selected-count');
+    const selRadio = document.getElementById('scope-selected-radio');
+    const selLabel = document.getElementById('scope-selected-label');
+    if (checkedRows.length === 0) {
+        selCountEl.textContent = '未勾选任何员工';
+        selRadio.disabled = true;
+        selLabel.style.opacity = '0.5';
+        document.querySelector('input[name="scope"][value="missing"]').checked = true;
+    } else {
+        selCountEl.textContent = `已选 ${checkedRows.length} 人（其中 ${checkedMissing.length} 人邮箱为空将被填充）`;
+        selRadio.disabled = false;
+        selLabel.style.opacity = '';
+    }
+
+    // 把勾选的员工 ID 写入隐藏字段，供 scope=selected 时使用
+    const holder = document.getElementById('default-email-ids');
+    holder.innerHTML = '';
+    checkedRows.forEach(r => {
+        const id = r.querySelector('.emp-cb').value;
+        holder.innerHTML += `<input type="hidden" name="employee_ids" value="${id}">`;
+    });
+}
+
+// ── 编辑员工 ──
+function openEdit(empId, name, email) {
+    document.getElementById('edit-emp-id').value = empId;
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-email').value = email;
+    document.getElementById('edit-form').action = `/employees/edit/${empId}`;
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+// ── 复选框逻辑 ──
+const selectAll     = document.getElementById('select-all');
+const sendBtn       = document.getElementById('send-email-btn');
+const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+const selCount      = document.getElementById('sel-count');
+
+function getChecked() {
+    return Array.from(document.querySelectorAll('.emp-cb:checked'));
+}
+function updateBar() {
+    const checked = getChecked();
+    const n = checked.length;
+    selCount.textContent = n > 0 ? `已选 ${n} 人` : '';
+    sendBtn.style.display = n > 0 ? '' : 'none';
+    if (bulkDeleteBtn) bulkDeleteBtn.style.display = n > 0 ? '' : 'none';
+    if (selectAll) selectAll.indeterminate = n > 0 && n < document.querySelectorAll('.emp-cb').length;
+    if (selectAll) selectAll.checked = n > 0 && n === document.querySelectorAll('.emp-cb').length;
+}
+
+// ── 批量删除弹窗 ──
+function openBulkDeleteModal() {
+    const checked = getChecked();
+    const idsDiv  = document.getElementById('bulk-delete-ids');
+    idsDiv.innerHTML = '';
+    const lines = [];
+    checked.forEach(cb => {
+        const row  = cb.closest('tr');
+        const empId = cb.value;
+        const name  = row.cells[2].textContent.trim();
+        idsDiv.innerHTML += `<input type="hidden" name="employee_ids" value="${empId}">`;
+        lines.push(`${name}（${empId}）`);
+    });
+    document.getElementById('bulk-delete-count').textContent = checked.length;
+    document.getElementById('bulk-delete-names').innerHTML = lines.join('<br>');
+    new bootstrap.Modal(document.getElementById('bulkDeleteModal')).show();
+}
+document.querySelectorAll('.emp-cb').forEach(cb => cb.addEventListener('change', updateBar));
+if (selectAll) {
+    selectAll.addEventListener('change', function() {
+        document.querySelectorAll('.emp-cb').forEach(cb => cb.checked = this.checked);
+        updateBar();
+    });
+}
+
+// ── 发送邮件弹窗 ──
+function openSendModal() {
+    const checked = getChecked();
+    const hiddenDiv = document.getElementById('hidden-employee-ids');
+    hiddenDiv.innerHTML = '';
+    const nameLines = [];
+    checked.forEach(cb => {
+        const row = cb.closest('tr');
+        const empId = cb.value;
+        const name = row.cells[2].textContent.trim();
+        const email = row.cells[3].textContent.trim();
+        hiddenDiv.innerHTML += `<input type="hidden" name="employee_ids" value="${empId}">`;
+        nameLines.push(`${name}（${empId}）${email !== '-' ? ' — ' + email : ' — 无邮箱'}`);
+    });
+    document.getElementById('selected-names').innerHTML = nameLines.join('<br>');
+    document.getElementById('template-select').value = '';
+    document.getElementById('template-preview').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('sendEmailModal')).show();
+}
+
+document.getElementById('template-select')?.addEventListener('change', function() {
+    const id = parseInt(this.value);
+    const preview = document.getElementById('template-preview');
+    if (id && templateData[id]) {
+        document.getElementById('preview-subject').textContent = templateData[id].subject;
+        document.getElementById('preview-cc').textContent = templateData[id].cc || '无';
+        preview.style.display = '';
+    } else {
+        preview.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

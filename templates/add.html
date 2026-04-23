@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}添加人员{% endblock %}
+
+{% block extra_css %}
+{% include '_personnel_form_css.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>➕ 添加人员</h5>
+</div>
+<div class="content-body">
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if form.errors %}
+    <div class="alert alert-danger py-2" style="max-width: 760px;">
+        <strong>表单校验失败：</strong>
+        <ul class="mb-0 mt-1 ps-3">
+            {% for field, errors in form.errors.items() %}
+                {% for error in errors %}
+                    <li>{{ form[field].label.text if form[field] else field }}：{{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-3 shadow-sm p-4" style="max-width: 760px;">
+        <form id="personnel-form" method="POST" action="{{ url_for('personnel.add') }}" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            <input type="hidden" name="clone_from_id" value="{{ clone_from_id or '' }}">
+            {% set personnel = None %}
+            {% include '_personnel_form_body.html' %}
+
+            <div class="d-grid mt-3">
+                {{ form.submit(class="btn btn-primary btn-lg") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{# 新增页默认无预填；若由 /clone/<id> 进入，视图会传入 prefill_dates / prefill_has_property / clone_src #}
+{% set prefill_dates = prefill_dates | default({}) %}
+{% set prefill_has_property = prefill_has_property | default('') %}
+{% set clone_from_id = clone_from_id | default(None) %}
+{% set clone_src = clone_src | default(None) %}
+{% include '_personnel_form_scripts.html' %}
+{% endblock %}

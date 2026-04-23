@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>异地骨干人员信息收集</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            min-height: 100vh;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+        .form-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 800px;
+            margin: 50px auto 400px;
+        }
+        .form-header {
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            margin: -30px -30px 30px -30px;
+            text-align: center;
+        }
+        .form-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+        .form-section {
+            margin-bottom: 25px;
+        }
+        .form-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .form-section input[type="text"],
+        .form-section input[type="date"],
+        .form-section select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .form-section input[type="radio"] {
+            margin-right: 5px;
+        }
+        .form-section .radio-group {
+            display: flex;
+            gap: 20px;
+        }
+        .form-section .radio-group label {
+            margin-bottom: 0;
+        }
+        .form-section select:disabled, .form-section input:disabled {
+            background: #f3f4f6 !important;
+            color: #6b7280;
+            cursor: not-allowed;
+        }
+        .loc-edit-btn {
+            background: #fef3c7; border: 1px solid #f59e0b; color: #92400e;
+            border-radius: 4px; padding: 4px 12px; font-size: 12px; cursor: pointer;
+            white-space: nowrap;
+        }
+        .loc-edit-btn:hover { background: #fde68a; }
+        .loc-edit-btn.editing { background: #dcfce7; border-color: #10b981; color: #065f46; }
+        .loc-clear-btn {
+            display: none; background: none; border: none; color: #9ca3af;
+            font-size: 12px; cursor: pointer; padding: 2px 0; margin-top: 4px;
+            text-decoration: underline;
+        }
+        .loc-clear-btn:hover { color: #6b7280; }
+        .adj-date-wrap { margin-top: 8px; display: none; }
+        .adj-date-wrap.show { display: block; }
+        .adj-date-label {
+            display: block; font-size: 13px; font-weight: 500;
+            color: #b45309; margin-bottom: 4px;
+        }
+        .date-picker-container { position: relative; }
+        .date-display-input { cursor: pointer; background: white !important; padding-right: 1.8rem; }
+        .cal-clear-x {
+            display: none; position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+            background: none; border: none; cursor: pointer; color: #9ca3af;
+            font-size: 18px; line-height: 1; padding: 0 3px; z-index: 2;
+        }
+        .cal-clear-x:hover { color: #6b7280; }
+        .cal-clear-x.visible { display: block; }
+        .calendar-popup {
+            display: none; position: absolute; top: calc(100% + 4px); left: 0;
+            background: white; border: 1px solid #ddd; border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1000; width: 300px;
+            user-select: none;
+        }
+        .calendar-popup.open { display: block; }
+        .cal-header {
+            display: flex; align-items: center;
+            padding: 10px 12px; border-bottom: 1px solid #eee;
+        }
+        .cal-nav-group { display: flex; flex-shrink: 0; }
+        .cal-nav-btn {
+            background: none; border: none; cursor: pointer; color: #555;
+            font-size: 15px; padding: 4px 7px; border-radius: 4px; line-height: 1;
+        }
+        .cal-nav-btn:hover { background: #f0f0f0; }
+        .cal-title { flex: 1; text-align: center; font-weight: 600; color: #1d4ed8; font-size: 14px; }
+        .cal-title-btn { cursor: pointer; }
+        .cal-title-btn:hover { text-decoration: underline; }
+        .cal-weekdays { display: grid; grid-template-columns: repeat(7,1fr); padding: 8px 8px 0; }
+        .cal-weekday { text-align: center; font-size: 12px; color: #999; padding: 4px 0; }
+        .cal-days { display: grid; padding: 4px 8px 8px; gap: 4px; }
+        .cal-day {
+            text-align: center; padding: 7px 2px; font-size: 13px;
+            cursor: pointer; border-radius: 50%; line-height: 1.4;
+        }
+        .cal-day.wide { border-radius: 6px; padding: 11px 4px; font-size: 13px; }
+        .cal-day:hover:not(.other-month) { background: #dbeafe; }
+        .cal-day.today { color: #1d4ed8; font-weight: 700; }
+        .cal-day.wide.today { background: #dbeafe; color: #1d4ed8; font-weight: 600; }
+        .cal-day.selected { background: #3b82f6 !important; color: white !important; font-weight: normal; }
+        .cal-day.other-month { color: #ccc; cursor: default; }
+        .cal-footer {
+            display: flex; align-items: center; padding: 8px 10px;
+            border-top: 1px solid #eee; gap: 6px;
+        }
+        .cal-date-display { flex: 1; font-size: 13px; color: #555; }
+        .cal-btn {
+            background: none; border: 1px solid #ddd; border-radius: 4px;
+            padding: 3px 9px; font-size: 12px; cursor: pointer; color: #555;
+        }
+        .cal-btn:hover { background: #f5f5f5; }
+        .cal-btn.confirm { background: #3b82f6; color: white; border-color: #3b82f6; }
+        .cal-btn.confirm:hover { background: #2563eb; }
+        .form-section .upload-section {
+            border: 1px dashed #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            background-color: #f9fafb;
+        }
+        .form-section .upload-section button {
+            background: #e5e7eb;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .submit-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+        }
+        .submit-btn:hover {
+            background: #2563eb;
+        }
+        .form-footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .required-star { color: #dc3545; font-weight: 700; margin-right: 2px; }
+        @keyframes flash-field {
+            0%   { box-shadow: none; background-color: transparent; }
+            20%  { box-shadow: 0 0 0 3px rgba(220,53,69,.45); background-color: rgba(220,53,69,.06); }
+            55%  { box-shadow: 0 0 0 3px rgba(220,53,69,.45); background-color: rgba(220,53,69,.06); }
+            100% { box-shadow: none; background-color: transparent; }
+        }
+        .field-flash { animation: flash-field 1.2s ease !important; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <div class="form-header">
+            <h1>异地骨干人员信息收集</h1>
+            <p style="margin:6px 0 0; font-size:13px; opacity:.85;">请如实填写以下信息，每个链接仅限提交一次</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div style="margin-bottom: 14px;">
+                    {% for category, message in messages %}
+                        <div style="padding: 10px 14px; border-radius: 6px; margin-bottom: 8px; background: #fee2e2; color: #991b1b; font-size: 13px;">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% if form.errors %}
+        <div style="padding: 12px 14px; border-radius: 6px; margin-bottom: 14px; background: #fee2e2; color: #991b1b; font-size: 13px;">
+            <strong>表单校验失败：</strong>
+            <ul style="margin: 6px 0 0; padding-left: 18px;">
+                {% for field, errors in form.errors.items() %}
+                    {% for error in errors %}
+                        <li>{{ form[field].label.text if form[field] else field }}：{{ error }}</li>
+                    {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data">
+            {{ form.hidden_tag() }}
+            
+            <div class="form-section">
+                <label><span class="required-star">*</span>1. 人员类型</label>
+                {{ form.personnel_type(class="form-control") }}
+            </div>
+            
+            <div class="form-section">
+                <label><span class="required-star">*</span>2. 员工编号</label>
+                {{ form.employee_id(class="form-control") }}
+            </div>
+            
+            <div class="form-section">
+                <label><span class="required-star">*</span>3. 姓名</label>
+                {{ form.name(class="form-control") }}
+            </div>
+            
+            <div class="form-section">
+                <label><span class="required-star">*</span>4. 职级 <button type="button" class="loc-edit-btn" id="rank-edit-btn" style="display:none; margin-left:8px;" onclick="toggleRankEdit()">编辑</button></label>
+                {{ form.rank(class="form-control", onwheel="this.blur()", id="rank_input", style="max-width:160px;") }}
+                <div class="adj-date-wrap" id="rank-adj-wrap">
+                    <span class="adj-date-label">职级调整时间（必填）</span>
+                    <div class="date-picker-container" id="rank-date-cal-wrap">
+                        <input type="text" class="form-control date-display-input" id="rank_date_display" readonly placeholder="请选择调整时间">
+                    </div>
+                    <input type="hidden" name="rank_date" id="rank_date">
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <label><span class="required-star">*</span>5. 工作所在地 <button type="button" class="loc-edit-btn" id="work-edit-btn" style="display:none; margin-left:8px;" onclick="toggleLocEdit('work')">编辑</button></label>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                    {{ form.work_province(class="form-control", id="work_province", style="flex: 1;") }}
+                    {{ form.work_city(class="form-control", id="work_city", style="flex: 1;") }}
+                </div>
+                <button type="button" class="loc-clear-btn" id="work-clear-btn" onclick="clearLoc('work')">清除填写</button>
+                <div class="adj-date-wrap" id="work-adj-wrap">
+                    <span class="adj-date-label">调整时间（必填）</span>
+                    <div class="date-picker-container" id="work-loc-date-wrap">
+                        <input type="text" class="form-control date-display-input" id="work_location_date_display" readonly placeholder="请选择调整时间">
+                    </div>
+                    <input type="hidden" name="work_location_date" id="work_location_date">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <label><span class="required-star">*</span>6. 户口所在地 <button type="button" class="loc-edit-btn" id="household-edit-btn" style="display:none; margin-left:8px;" onclick="toggleLocEdit('household')">编辑</button></label>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                    {{ form.household_province(class="form-control", id="household_province", style="flex: 1;") }}
+                    {{ form.household_city(class="form-control", id="household_city", style="flex: 1;") }}
+                </div>
+                <button type="button" class="loc-clear-btn" id="household-clear-btn" onclick="clearLoc('household')">清除填写</button>
+                <div class="adj-date-wrap" id="household-adj-wrap">
+                    <span class="adj-date-label">调整时间（必填）</span>
+                    <div class="date-picker-container" id="household-loc-date-wrap">
+                        <input type="text" class="form-control date-display-input" id="household_location_date_display" readonly placeholder="请选择调整时间">
+                    </div>
+                    <input type="hidden" name="household_location_date" id="household_location_date">
+                </div>
+                <div style="margin-top:10px; padding:10px; background:#f0f9ff; border:1px dashed #93c5fd; border-radius:6px;">
+                    <label style="font-size:13px; font-weight:500; color:#1d4ed8;"><span class="required-star">*</span>户口本材料上传 <span style="color:#6b7280; font-weight:normal;">(需上传：户口本首页、个人页)</span></label>
+                    {% if prefill_src %}
+                        {% for att in prefill_src.attachments if att.category == 'household' %}
+                        <div id="clone-att-{{ att.id }}" data-cat="household" style="display:flex; align-items:center; gap:8px; margin-top:6px; padding:6px 8px; background:#dcfce7; border:1px solid #86efac; border-radius:4px;">
+                            <span>📎</span>
+                            <a href="{{ url_for('public.get_file', file_id=att.id) }}" target="_blank" style="flex:1; color:#166534; font-size:12px; word-break:break-all;">{{ att.filename }}</a>
+                            <button type="button" style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer;" onclick="removeCloneAtt({{ att.id }})">移除</button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                    <input type="file" name="household_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.rar,.zip,.gz" multiple id="household_file_input" style="margin-top:5px;">
+                    <div id="household_file_status" style="margin-top:6px; font-size:12px;"></div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <label>7. 配偶常住地 <span style="color:#6b7280; font-size:12px; font-weight:400;">(选填)</span> <button type="button" class="loc-edit-btn" id="spouse-edit-btn" style="display:none; margin-left:8px;" onclick="toggleLocEdit('spouse')">编辑</button></label>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                    {{ form.spouse_province(class="form-control", id="spouse_province", style="flex: 1;") }}
+                    {{ form.spouse_city(class="form-control", id="spouse_city", style="flex: 1;") }}
+                </div>
+                <button type="button" class="loc-clear-btn" id="spouse-clear-btn" onclick="clearLoc('spouse')">清除填写</button>
+                <div class="adj-date-wrap" id="spouse-adj-wrap">
+                    <span class="adj-date-label">调整时间（必填）</span>
+                    <div class="date-picker-container" id="spouse-loc-date-wrap">
+                        <input type="text" class="form-control date-display-input" id="spouse_location_date_display" readonly placeholder="请选择调整时间">
+                    </div>
+                    <input type="hidden" name="spouse_location_date" id="spouse_location_date">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <label>8. 子女常住地 <span style="color:#6b7280; font-size:12px; font-weight:400;">(选填)</span></label>
+                <div style="display: flex; gap: 10px; margin-top: 5px;">
+                    {{ form.children_province(class="form-control", id="children_province", style="flex: 1;") }}
+                    {{ form.children_city(class="form-control", id="children_city", style="flex: 1;") }}
+                </div>
+                <button type="button" class="loc-clear-btn" id="children-clear-btn" onclick="clearLoc('children')">清除填写</button>
+            </div>
+            
+            <div class="form-section">
+                <label><span class="required-star">*</span>9. 是否在工作地购置房产</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="has_property" value="是" onchange="updatePropertySection()"> 是</label>
+                    <label><input type="radio" name="has_property" value="否" onchange="updatePropertySection()"> 否</label>
+                </div>
+            </div>
+
+            <div class="form-section" id="property-date-section" style="display:none;">
+                <label><span class="required-star">*</span>房产交付日期</label>
+                <div class="date-picker-container" id="property-cal-wrap">
+                    <input type="text" class="form-control date-display-input" id="property_date_display" readonly placeholder="请选择日期">
+                </div>
+                <input type="hidden" name="property_delivery_date" id="property_delivery_date">
+                <div style="margin-top:12px;">
+                    <label style="display:block; margin-bottom:6px; font-weight:600;"><span class="required-star">*</span>在工作地购置房产是否全部售出</label>
+                    <div class="radio-group">
+                        <label><input type="radio" name="property_all_sold" value="是"> 是</label>
+                        <label><input type="radio" name="property_all_sold" value="否"> 否</label>
+                    </div>
+                </div>
+                <div style="margin-top:10px; padding:10px; background:#fef9c3; border:1px dashed #eab308; border-radius:6px;">
+                    <label style="font-size:13px; font-weight:500; color:#a16207;"><span class="required-star">*</span>房产材料上传 <span style="color:#6b7280; font-weight:normal;">(需上传：房产证 或 购房合同)</span></label>
+                    {% if prefill_src %}
+                        {% for att in prefill_src.attachments if att.category == 'property' %}
+                        <div id="clone-att-{{ att.id }}" data-cat="property" style="display:flex; align-items:center; gap:8px; margin-top:6px; padding:6px 8px; background:#fef3c7; border:1px solid #fde047; border-radius:4px;">
+                            <span>📎</span>
+                            <a href="{{ url_for('public.get_file', file_id=att.id) }}" target="_blank" style="flex:1; color:#a16207; font-size:12px; word-break:break-all;">{{ att.filename }}</a>
+                            <button type="button" style="background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer;" onclick="removeCloneAtt({{ att.id }})">移除</button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                    <input type="file" name="property_contract" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.rar,.zip,.gz" multiple id="property_file_input" style="margin-top:5px;">
+                    <div id="property_file_status" style="margin-top:6px; font-size:12px;"></div>
+                </div>
+            </div>
+
+            <div class="form-section" id="remote-start-section">
+                <label>10. 异地开始时间</label>
+                <div class="date-picker-container" id="remote-cal-wrap">
+                    <input type="text" class="form-control date-display-input" id="remote_date_display" readonly placeholder="请选择日期">
+                </div>
+                <input type="hidden" name="remote_start_date" id="remote_start_date">
+            </div>
+            
+            {{ form.submit(class="submit-btn") }}
+            
+            <div class="form-footer">
+                <p>© 2026 组织人事部门 | 联系电话：12345678</p>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        // 城市数据
+        const cityData = {
+            "北京市": ["北京市"],
+            "天津市": ["天津市"],
+            "河北省": ["石家庄市", "唐山市", "秦皇岛市", "邯郸市", "邢台市", "保定市", "张家口市", "承德市", "沧州市", "廊坊市", "衡水市"],
+            "山西省": ["太原市", "大同市", "阳泉市", "长治市", "晋城市", "朔州市", "晋中市", "运城市", "忻州市", "临汾市", "吕梁市"],
+            "内蒙古自治区": ["呼和浩特市", "包头市", "乌海市", "赤峰市", "通辽市", "鄂尔多斯市", "呼伦贝尔市", "巴彦淖尔市", "乌兰察布市", "兴安盟", "锡林郭勒盟", "阿拉善盟"],
+            "辽宁省": ["沈阳市", "大连市", "鞍山市", "抚顺市", "本溪市", "丹东市", "锦州市", "营口市", "阜新市", "辽阳市", "盘锦市", "铁岭市", "朝阳市", "葫芦岛市"],
+            "吉林省": ["长春市", "吉林市", "四平市", "辽源市", "通化市", "白山市", "松原市", "白城市", "延边朝鲜族自治州"],
+            "黑龙江省": ["哈尔滨市", "齐齐哈尔市", "鸡西市", "鹤岗市", "双鸭山市", "大庆市", "伊春市", "佳木斯市", "七台河市", "牡丹江市", "黑河市", "绥化市", "大兴安岭地区"],
+            "上海市": ["上海市"],
+            "江苏省": ["南京市", "无锡市", "徐州市", "常州市", "苏州市", "南通市", "连云港市", "淮安市", "盐城市", "扬州市", "镇江市", "泰州市", "宿迁市"],
+            "浙江省": ["杭州市", "宁波市", "温州市", "嘉兴市", "湖州市", "绍兴市", "金华市", "衢州市", "舟山市", "台州市", "丽水市"],
+            "安徽省": ["合肥市", "芜湖市", "蚌埠市", "淮南市", "马鞍山市", "淮北市", "铜陵市", "安庆市", "黄山市", "滁州市", "阜阳市", "宿州市", "六安市", "亳州市", "池州市", "宣城市"],
+            "福建省": ["福州市", "厦门市", "莆田市", "三明市", "泉州市", "漳州市", "南平市", "龙岩市", "宁德市"],
+            "江西省": ["南昌市", "景德镇市", "萍乡市", "九江市", "新余市", "鹰潭市", "赣州市", "宜春市", "上饶市", "吉安市", "抚州市"],
+            "山东省": ["济南市", "青岛市", "淄博市", "枣庄市", "东营市", "烟台市", "潍坊市", "济宁市", "泰安市", "威海市", "日照市", "临沂市", "德州市", "聊城市", "滨州市", "菏泽市"],
+            "河南省": ["郑州市", "开封市", "洛阳市", "平顶山市", "安阳市", "鹤壁市", "新乡市", "焦作市", "濮阳市", "许昌市", "漯河市", "三门峡市", "南阳市", "商丘市", "信阳市", "周口市", "驻马店市"],
+            "湖北省": ["武汉市", "黄石市", "十堰市", "宜昌市", "襄阳市", "鄂州市", "荆门市", "孝感市", "荆州市", "黄冈市", "咸宁市", "随州市", "恩施土家族苗族自治州", "仙桃市", "潜江市", "天门市", "神农架林区"],
+            "湖南省": ["长沙市", "株洲市", "湘潭市", "衡阳市", "邵阳市", "岳阳市", "常德市", "张家界市", "益阳市", "郴州市", "永州市", "怀化市", "娄底市", "湘西土家族苗族自治州"],
+            "广东省": ["广州市", "韶关市", "深圳市", "珠海市", "汕头市", "佛山市", "江门市", "湛江市", "茂名市", "肇庆市", "惠州市", "梅州市", "汕尾市", "河源市", "阳江市", "清远市", "东莞市", "中山市", "潮州市", "揭阳市", "云浮市"],
+            "广西壮族自治区": ["南宁市", "柳州市", "桂林市", "梧州市", "北海市", "防城港市", "钦州市", "贵港市", "玉林市", "百色市", "贺州市", "河池市", "来宾市", "崇左市"],
+            "海南省": ["海口市", "三亚市", "三沙市", "儋州市", "五指山市", "琼海市", "文昌市", "万宁市", "东方市", "定安县", "屯昌县", "澄迈县", "临高县", "白沙黎族自治县", "昌江黎族自治县", "乐东黎族自治县", "陵水黎族自治县", "保亭黎族苗族自治县", "琼中黎族苗族自治县"],
+            "重庆市": ["重庆市"],
+            "四川省": ["成都市", "自贡市", "攀枝花市", "泸州市", "德阳市", "绵阳市", "广元市", "遂宁市", "内江市", "乐山市", "南充市", "眉山市", "宜宾市", "广安市", "达州市", "雅安市", "巴中市", "资阳市", "阿坝藏族羌族自治州", "甘孜藏族自治州", "凉山彝族自治州"],
+            "贵州省": ["贵阳市", "六盘水市", "遵义市", "安顺市", "毕节市", "铜仁市", "黔西南布依族苗族自治州", "黔东南苗族侗族自治州", "黔南布依族苗族自治州"],
+            "云南省": ["昆明市", "曲靖市", "玉溪市", "保山市", "昭通市", "丽江市", "普洱市", "临沧市", "楚雄彝族自治州", "红河哈尼族彝族自治州", "文山壮族苗族自治州", "西双版纳傣族自治州", "大理白族自治州", "德宏傣族景颇族自治州", "怒江傈僳族自治州", "迪庆藏族自治州"],
+            "西藏自治区": ["拉萨市", "日喀则市", "昌都市", "林芝市", "山南市", "那曲市", "阿里地区"],
+            "陕西省": ["西安市", "铜川市", "宝鸡市", "咸阳市", "渭南市", "延安市", "汉中市", "榆林市", "安康市", "商洛市"],
+            "甘肃省": ["兰州市", "嘉峪关市", "金昌市", "白银市", "天水市", "武威市", "张掖市", "平凉市", "酒泉市", "庆阳市", "定西市", "陇南市", "临夏回族自治州", "甘南藏族自治州"],
+            "青海省": ["西宁市", "海东市", "海北藏族自治州", "黄南藏族自治州", "海南藏族自治州", "果洛藏族自治州", "玉树藏族自治州", "海西蒙古族藏族自治州"],
+            "宁夏回族自治区": ["银川市", "石嘴山市", "吴忠市", "固原市", "中卫市"],
+            "新疆维吾尔自治区": ["乌鲁木齐市", "克拉玛依市", "吐鲁番市", "哈密市", "昌吉回族自治州", "博尔塔拉蒙古自治州", "巴音郭楞蒙古自治州", "阿克苏地区", "克孜勒苏柯尔克孜自治州", "喀什地区", "和田地区", "伊犁哈萨克自治州", "塔城地区", "阿勒泰地区", "石河子市", "阿拉尔市", "图木舒克市", "五家渠市", "北屯市", "铁门关市", "双河市", "可克达拉市", "昆玉市", "胡杨河市", "新星市"]
+        };
+        
+        // 绑定省份选择事件
+        function bindProvinceChange(provinceId, cityId) {
+            const provinceSelect = document.getElementById(provinceId);
+            const citySelect = document.getElementById(cityId);
+            
+            provinceSelect.addEventListener('change', function() {
+                const province = this.value;
+                citySelect.innerHTML = '<option value="">请选择市</option>';
+                if (province && cityData[province]) {
+                    cityData[province].forEach(city => {
+                        const option = document.createElement('option');
+                        option.value = city;
+                        option.textContent = city;
+                        citySelect.appendChild(option);
+                    });
+                }
+            });
+        }
+        
+        // 绑定所有省份选择事件
+        bindProvinceChange('work_province', 'work_city');
+        bindProvinceChange('household_province', 'household_city');
+        bindProvinceChange('spouse_province', 'spouse_city');
+        bindProvinceChange('children_province', 'children_city');
+
+        
+        // 三视图日历弹窗（日/月/年）
+        function createCalendar(wrapperId, hiddenId, displayId) {
+            const wrapper = document.getElementById(wrapperId);
+            const hidden = document.getElementById(hiddenId);
+            const display = document.getElementById(displayId);
+
+            const TD = new Date();
+            let selDate = null, viewY = TD.getFullYear(), viewM = TD.getMonth();
+            let tempDate = null, view = 'day', yrStart = viewY - 7;
+
+            const popup = document.createElement('div');
+            popup.className = 'calendar-popup';
+            popup.innerHTML = `
+                <div class="cal-header">
+                    <div class="cal-nav-group">
+                        <button type="button" class="cal-nav-btn" data-a="pb">«</button>
+                        <button type="button" class="cal-nav-btn cal-sm" data-a="ps">‹</button>
+                    </div>
+                    <span class="cal-title"></span>
+                    <div class="cal-nav-group">
+                        <button type="button" class="cal-nav-btn cal-sm" data-a="ns">›</button>
+                        <button type="button" class="cal-nav-btn" data-a="nb">»</button>
+                    </div>
+                </div>
+                <div class="cal-weekdays">
+                    <div class="cal-weekday">日</div><div class="cal-weekday">一</div>
+                    <div class="cal-weekday">二</div><div class="cal-weekday">三</div>
+                    <div class="cal-weekday">四</div><div class="cal-weekday">五</div>
+                    <div class="cal-weekday">六</div>
+                </div>
+                <div class="cal-days"></div>
+                <div class="cal-footer">
+                    <span class="cal-date-display">--</span>
+                    <button type="button" class="cal-btn clr">清空</button>
+                    <button type="button" class="cal-btn now">现在</button>
+                    <button type="button" class="cal-btn confirm">确定</button>
+                </div>`;
+            wrapper.appendChild(popup);
+            popup.addEventListener('click', e => e.stopPropagation());
+
+            const titleEl = popup.querySelector('.cal-title');
+            const wkEl = popup.querySelector('.cal-weekdays');
+            const gridEl = popup.querySelector('.cal-days');
+            const dateLbl = popup.querySelector('.cal-date-display');
+            const psBtn = popup.querySelector('[data-a="ps"]');
+            const nsBtn = popup.querySelector('[data-a="ns"]');
+
+            function pad(n) { return String(n).padStart(2, '0'); }
+            function fmt(d) { return d ? d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) : ''; }
+
+            function render() {
+                dateLbl.textContent = tempDate ? fmt(tempDate) : '--';
+                if (view === 'day') renderDay();
+                else if (view === 'month') renderMonth();
+                else renderYear();
+            }
+
+            function renderDay() {
+                wkEl.style.display = ''; psBtn.style.visibility = ''; nsBtn.style.visibility = '';
+                titleEl.style.cursor = 'default';
+                titleEl.innerHTML =
+                    '<span class="cal-title-btn">' + viewY + '年</span>' +
+                    '&nbsp;<span class="cal-title-btn">' + (viewM + 1) + '月</span>';
+                titleEl.querySelectorAll('.cal-title-btn')[0].addEventListener('click', e => { e.stopPropagation(); yrStart = viewY - 7; view = 'year'; render(); });
+                titleEl.querySelectorAll('.cal-title-btn')[1].addEventListener('click', e => { e.stopPropagation(); view = 'month'; render(); });
+                gridEl.style.gridTemplateColumns = 'repeat(7,1fr)';
+                const firstDay = new Date(viewY, viewM, 1).getDay();
+                const dim = new Date(viewY, viewM + 1, 0).getDate();
+                const prevDim = new Date(viewY, viewM, 0).getDate();
+                gridEl.innerHTML = '';
+                for (let i = firstDay - 1; i >= 0; i--) {
+                    const d = document.createElement('div'); d.className = 'cal-day other-month';
+                    d.textContent = prevDim - i; gridEl.appendChild(d);
+                }
+                for (let n = 1; n <= dim; n++) {
+                    const d = document.createElement('div'); d.className = 'cal-day'; d.textContent = n;
+                    if (TD.getFullYear()===viewY && TD.getMonth()===viewM && TD.getDate()===n) d.classList.add('today');
+                    if (tempDate && tempDate.getFullYear()===viewY && tempDate.getMonth()===viewM && tempDate.getDate()===n) d.classList.add('selected');
+                    d.addEventListener('click', () => { tempDate = new Date(viewY, viewM, n); render(); });
+                    gridEl.appendChild(d);
+                }
+                const total = firstDay + dim;
+                for (let n = 1; n <= (total % 7 === 0 ? 0 : 7 - total % 7); n++) {
+                    const d = document.createElement('div'); d.className = 'cal-day other-month';
+                    d.textContent = n; gridEl.appendChild(d);
+                }
+            }
+
+            function renderMonth() {
+                wkEl.style.display = 'none'; psBtn.style.visibility = 'hidden'; nsBtn.style.visibility = 'hidden';
+                titleEl.style.cursor = 'pointer';
+                titleEl.textContent = viewY + '年';
+                gridEl.style.gridTemplateColumns = 'repeat(4,1fr)';
+                gridEl.innerHTML = '';
+                ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'].forEach((nm, i) => {
+                    const d = document.createElement('div'); d.className = 'cal-day wide'; d.textContent = nm;
+                    if (TD.getFullYear()===viewY && TD.getMonth()===i) d.classList.add('today');
+                    if (tempDate && tempDate.getFullYear()===viewY && tempDate.getMonth()===i) d.classList.add('selected');
+                    d.addEventListener('click', () => { viewM = i; view = 'day'; render(); });
+                    gridEl.appendChild(d);
+                });
+            }
+
+            function renderYear() {
+                wkEl.style.display = 'none'; psBtn.style.visibility = 'hidden'; nsBtn.style.visibility = 'hidden';
+                titleEl.style.cursor = 'default';
+                titleEl.textContent = yrStart + '年 - ' + (yrStart + 19) + '年';
+                gridEl.style.gridTemplateColumns = 'repeat(4,1fr)';
+                gridEl.innerHTML = '';
+                for (let y = yrStart; y < yrStart + 20; y++) {
+                    const d = document.createElement('div'); d.className = 'cal-day wide'; d.textContent = y;
+                    if (TD.getFullYear()===y) d.classList.add('today');
+                    if (tempDate && tempDate.getFullYear()===y) d.classList.add('selected');
+                    d.addEventListener('click', () => { viewY = y; view = 'month'; render(); });
+                    gridEl.appendChild(d);
+                }
+            }
+
+            popup.querySelector('[data-a="pb"]').addEventListener('click', () => {
+                if (view === 'day' || view === 'month') viewY--; else yrStart -= 20; render();
+            });
+            popup.querySelector('[data-a="nb"]').addEventListener('click', () => {
+                if (view === 'day' || view === 'month') viewY++; else yrStart += 20; render();
+            });
+            psBtn.addEventListener('click', () => { if (--viewM < 0) { viewM = 11; viewY--; } render(); });
+            nsBtn.addEventListener('click', () => { if (++viewM > 11) { viewM = 0; viewY++; } render(); });
+
+            titleEl.addEventListener('click', () => {
+                if (view === 'month') { yrStart = viewY - 7; view = 'year'; render(); }
+            });
+
+            const clearX = document.createElement('button');
+            clearX.type = 'button'; clearX.className = 'cal-clear-x'; clearX.innerHTML = '&times;'; clearX.title = '清空';
+            wrapper.appendChild(clearX);
+            function syncClearX() { clearX.classList.toggle('visible', !!display.value); }
+
+            popup.querySelector('.clr').addEventListener('click', () => {
+                tempDate = selDate = null; hidden.value = ''; display.value = ''; syncClearX(); render();
+            });
+            popup.querySelector('.now').addEventListener('click', () => {
+                tempDate = new Date(TD.getFullYear(), TD.getMonth(), TD.getDate());
+                viewY = tempDate.getFullYear(); viewM = tempDate.getMonth(); view = 'day'; render();
+            });
+            popup.querySelector('.confirm').addEventListener('click', () => {
+                if (tempDate) { selDate = tempDate; hidden.value = fmt(selDate); display.value = fmt(selDate); syncClearX(); }
+                popup.classList.remove('open');
+            });
+            clearX.addEventListener('click', e => { e.stopPropagation(); tempDate = selDate = null; hidden.value = ''; display.value = ''; syncClearX(); render(); });
+
+            display.addEventListener('click', () => {
+                if (selDate) { tempDate = new Date(selDate); viewY = tempDate.getFullYear(); viewM = tempDate.getMonth(); }
+                else { tempDate = null; viewY = TD.getFullYear(); viewM = TD.getMonth(); }
+                view = 'day'; render();
+                popup.classList.toggle('open');
+            });
+            document.addEventListener('click', e => { if (!wrapper.contains(e.target)) popup.classList.remove('open'); });
+            render();
+        }
+
+        createCalendar('property-cal-wrap', 'property_delivery_date', 'property_date_display');
+        createCalendar('remote-cal-wrap', 'remote_start_date', 'remote_date_display');
+        createCalendar('work-loc-date-wrap', 'work_location_date', 'work_location_date_display');
+        createCalendar('household-loc-date-wrap', 'household_location_date', 'household_location_date_display');
+        createCalendar('spouse-loc-date-wrap', 'spouse_location_date', 'spouse_location_date_display');
+        createCalendar('rank-date-cal-wrap', 'rank_date', 'rank_date_display');
+
+        function updatePropertySection() {
+            const val = document.querySelector('input[name="has_property"]:checked')?.value;
+            const show = val === '是';
+            document.getElementById('property-date-section').style.display = show ? '' : 'none';
+            if (!show) {
+                document.getElementById('property_delivery_date').value = '';
+                document.getElementById('property_date_display').value = '';
+                document.querySelectorAll('input[name="property_all_sold"]').forEach(r => r.checked = false);
+            }
+        }
+
+        // ── 预填数据 ──
+        const prefill = {{ prefill | tojson }};
+        if (prefill && Object.keys(prefill).length > 0) {
+            function setVal(name, val) {
+                const el = document.querySelector(`[name="${name}"]`);
+                if (el && val !== undefined && val !== null && val !== '') el.value = val;
+            }
+            function setProvinceThenCity(provId, cityId, province, city) {
+                const pSel = document.getElementById(provId);
+                const cSel = document.getElementById(cityId);
+                if (!pSel || !province) return;
+                pSel.value = province;
+                pSel.dispatchEvent(new Event('change'));
+                if (city) setTimeout(() => { cSel.value = city; }, 0);
+            }
+            function setDate(hiddenId, displayId, val) {
+                if (!val) return;
+                document.getElementById(hiddenId).value = val;
+                document.getElementById(displayId).value = val;
+            }
+
+            setVal('personnel_type', prefill.personnel_type);
+            setVal('employee_id', prefill.employee_id);
+            setVal('name', prefill.name);
+            setVal('rank', prefill.rank);
+            setProvinceThenCity('work_province', 'work_city', prefill.work_province, prefill.work_city);
+            setProvinceThenCity('household_province', 'household_city', prefill.household_province, prefill.household_city);
+            setProvinceThenCity('spouse_province', 'spouse_city', prefill.spouse_province, prefill.spouse_city);
+            setProvinceThenCity('children_province', 'children_city', prefill.children_province, prefill.children_city);
+            if (prefill.has_property) {
+                document.querySelectorAll('input[name="has_property"]').forEach(r => {
+                    r.checked = (r.value === prefill.has_property);
+                });
+                updatePropertySection();
+                if (prefill.has_property === '是') {
+                    setDate('property_delivery_date', 'property_date_display', prefill.property_delivery_date);
+                    if (prefill.property_all_sold) {
+                        document.querySelectorAll('input[name="property_all_sold"]').forEach(r => {
+                            r.checked = (r.value === prefill.property_all_sold);
+                        });
+                    }
+                }
+            }
+            setDate('remote_start_date', 'remote_date_display', prefill.remote_start_date);
+        }
+
+        // ── 非首次填写模式 ──
+        // 若 prefill 含完整历史记录（personnel_type），则启用"编辑 + 调整时间"逻辑
+        const isPrefillMode = !!(prefill && prefill.personnel_type);
+        const locKeys = ['work', 'household', 'spouse'];
+        const editedLocs = {};  // { work: true/false, ... }
+
+        function setSelectDisabled(id, disabled) {
+            const el = document.getElementById(id);
+            if (el) el.disabled = disabled;
+        }
+
+        let rankEdited = false;
+
+        function toggleRankEdit() {
+            rankEdited = !rankEdited;
+            const btn = document.getElementById('rank-edit-btn');
+            const wrap = document.getElementById('rank-adj-wrap');
+            const inp = document.getElementById('rank_input');
+            if (rankEdited) {
+                inp.readOnly = false;
+                inp.style.background = '';
+                btn.textContent = '取消修改';
+                btn.classList.add('editing');
+                wrap.classList.add('show');
+            } else {
+                inp.readOnly = true;
+                inp.style.background = '#f3f4f6';
+                btn.textContent = '编辑';
+                btn.classList.remove('editing');
+                wrap.classList.remove('show');
+                inp.value = prefill.rank || '';
+                document.getElementById('rank_date').value = '';
+                document.getElementById('rank_date_display').value = '';
+            }
+        }
+
+        function clearLoc(loc) {
+            const pSel = document.getElementById(`${loc}_province`);
+            const cSel = document.getElementById(`${loc}_city`);
+            if (pSel) pSel.value = '';
+            if (cSel) cSel.innerHTML = '<option value="">请选择市</option>';
+        }
+
+        function toggleLocEdit(loc) {
+            const edited = !editedLocs[loc];
+            editedLocs[loc] = edited;
+            const btn = document.getElementById(`${loc}-edit-btn`);
+            const wrap = document.getElementById(`${loc}-adj-wrap`);
+            const clearBtn = document.getElementById(`${loc}-clear-btn`);
+            setSelectDisabled(`${loc}_province`, !edited);
+            setSelectDisabled(`${loc}_city`, !edited);
+            if (edited) {
+                btn.textContent = '取消修改';
+                btn.classList.add('editing');
+                wrap.classList.add('show');
+                if (clearBtn) clearBtn.style.display = '';
+            } else {
+                btn.textContent = '编辑';
+                btn.classList.remove('editing');
+                wrap.classList.remove('show');
+                if (clearBtn) clearBtn.style.display = 'none';
+                // 恢复原值
+                if (prefill[`${loc}_province`]) {
+                    document.getElementById(`${loc}_province`).value = prefill[`${loc}_province`];
+                    const citySel = document.getElementById(`${loc}_city`);
+                    citySel.innerHTML = '<option value="">请选择市</option>';
+                    (cityData[prefill[`${loc}_province`]] || []).forEach(c => {
+                        const o = document.createElement('option'); o.value = c; o.textContent = c;
+                        citySel.appendChild(o);
+                    });
+                    if (prefill[`${loc}_city`]) citySel.value = prefill[`${loc}_city`];
+                }
+                // 清空调整时间
+                document.getElementById(`${loc}_location_date`).value = '';
+                document.getElementById(`${loc}_location_date_display`).value = '';
+            }
+        }
+
+        // 文件累加上传：每次选择追加而非替换，支持单个移除
+        function wireFileAccumulator(inputId, statusId) {
+            const inp = document.getElementById(inputId);
+            const status = document.getElementById(statusId);
+            if (!inp || !status) return;
+            const store = new DataTransfer();
+
+            function syncInput() {
+                const dt = new DataTransfer();
+                for (let i = 0; i < store.items.length; i++) dt.items.add(store.files[i]);
+                inp.files = dt.files;
+            }
+            function render() {
+                if (store.items.length === 0) { status.innerHTML = ''; return; }
+                const wrap = document.createElement('div');
+                const header = document.createElement('div');
+                header.style.cssText = 'color:#059669; font-weight:600;';
+                header.textContent = `✓ 待上传 ${store.items.length} 个文件：`;
+                wrap.appendChild(header);
+                for (let i = 0; i < store.items.length; i++) {
+                    const f = store.files[i];
+                    const row = document.createElement('div');
+                    row.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top:4px;';
+                    row.innerHTML = `<span>📎</span>
+                        <span style="flex:1; word-break:break-all;">${f.name} <span style="color:#6b7280;">(${(f.size/1024).toFixed(1)} KB)</span></span>`;
+                    const rm = document.createElement('button');
+                    rm.type = 'button';
+                    rm.textContent = '移除';
+                    rm.style.cssText = 'background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer;';
+                    rm.addEventListener('click', () => {
+                        store.items.remove(i);
+                        syncInput();
+                        render();
+                    });
+                    row.appendChild(rm);
+                    wrap.appendChild(row);
+                }
+                status.innerHTML = '';
+                status.appendChild(wrap);
+            }
+            inp.addEventListener('change', function(e) {
+                const picked = Array.from(e.target.files || []);
+                picked.forEach(f => {
+                    const dup = Array.from(store.files).some(s => s.name === f.name && s.size === f.size && s.lastModified === f.lastModified);
+                    if (!dup) store.items.add(f);
+                });
+                syncInput();
+                render();
+            });
+        }
+        wireFileAccumulator('household_file_input', 'household_file_status');
+        wireFileAccumulator('property_file_input', 'property_file_status');
+
+        function removeCloneAtt(attId) {
+            const div = document.getElementById('clone-att-' + attId);
+            if (div) div.style.display = 'none';
+            const inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = 'clone_exclude_ids';
+            inp.value = attId;
+            document.querySelector('form').appendChild(inp);
+        }
+
+        function countCloneAtts(category) {
+            return Array.from(document.querySelectorAll(`[data-cat="${category}"]`))
+                .filter(el => el.style.display !== 'none').length;
+        }
+
+        if (isPrefillMode) {
+            // 员工编号置灰
+            document.querySelector('[name="employee_id"]').readOnly = true;
+            document.querySelector('[name="employee_id"]').style.background = '#f3f4f6';
+            // 隐藏"异地开始时间"
+            const rss = document.getElementById('remote-start-section');
+            if (rss) rss.style.display = 'none';
+            // 职级默认置灰 + 显示编辑按钮
+            const rankInp = document.getElementById('rank_input');
+            if (rankInp) {
+                rankInp.readOnly = true;
+                rankInp.style.background = '#f3f4f6';
+                document.getElementById('rank-edit-btn').style.display = '';
+            }
+            // 3 个地点默认置灰 + 显示编辑按钮（清除按钮随编辑状态显示）
+            locKeys.forEach(loc => {
+                setSelectDisabled(`${loc}_province`, true);
+                setSelectDisabled(`${loc}_city`, true);
+                document.getElementById(`${loc}-edit-btn`).style.display = '';
+            });
+            // 子女常住地无编辑锁，清除按钮始终显示
+            document.getElementById('children-clear-btn').style.display = '';
+        } else {
+            // 首次填写：所有地点清除按钮直接显示
+            ['work', 'household', 'spouse', 'children'].forEach(loc => {
+                const btn = document.getElementById(`${loc}-clear-btn`);
+                if (btn) btn.style.display = '';
+            });
+        }
+
+        // 统一提交前校验：收集所有未填必填项，滚动到第一个并全部闪红框
+        const submitForm = document.querySelector('form');
+        submitForm.addEventListener('submit', function(e) {
+            const failures = [];
+            const seen = new Set();
+            function addFail(el) {
+                if (!el) return;
+                const section = el.closest?.('.form-section') || el;
+                if (!seen.has(section)) { seen.add(section); failures.push(section); }
+            }
+
+            if (isPrefillMode) {
+                // 预填模式：编辑了职级必须填调整时间
+                if (rankEdited) {
+                    const rdv = document.getElementById('rank_date').value;
+                    if (!rdv) addFail(document.getElementById('rank_date_display'));
+                }
+                // 预填模式：编辑了的地点必须填调整时间
+                for (const loc of locKeys) {
+                    if (editedLocs[loc]) {
+                        const dv = document.getElementById(`${loc}_location_date`).value;
+                        if (!dv) addFail(document.getElementById(`${loc}_location_date_display`));
+                    } else {
+                        document.getElementById(`${loc}_location_date`).value = '';
+                    }
+                }
+                // 修改户口所在地时必须上传户口本材料
+                if (editedLocs['household']) {
+                    const hFiles = document.getElementById('household_file_input');
+                    if ((!hFiles || hFiles.files.length === 0) && countCloneAtts('household') === 0) addFail(hFiles);
+                }
+            } else {
+                // 首次填写：全部基础必填
+                const ptEl = document.getElementById('personnel_type');
+                if (!ptEl?.value) addFail(ptEl);
+                const eidEl = document.querySelector('[name="employee_id"]');
+                if (!eidEl?.value?.trim()) addFail(eidEl);
+                const nameEl = document.querySelector('[name="name"]');
+                if (!nameEl?.value?.trim()) addFail(nameEl);
+                const rankEl = document.querySelector('[name="rank"]');
+                if (!rankEl?.value?.trim()) addFail(rankEl);
+                const wpEl = document.getElementById('work_province');
+                const wcEl = document.getElementById('work_city');
+                if (!wpEl?.value || !wcEl?.value) addFail(wpEl);
+                const hpEl = document.getElementById('household_province');
+                const hcEl = document.getElementById('household_city');
+                if (!hpEl?.value || !hcEl?.value) addFail(hpEl);
+                const hFiles = document.getElementById('household_file_input');
+                if ((!hFiles || hFiles.files.length === 0) && countCloneAtts('household') === 0) addFail(hFiles);
+                const hasPropChecked = document.querySelector('input[name="has_property"]:checked');
+                if (!hasPropChecked) addFail(document.querySelector('input[name="has_property"]'));
+            }
+
+            // 购置房产=是时条件必填（两种模式均适用）
+            const hasProperty = document.querySelector('input[name="has_property"]:checked')?.value;
+            if (hasProperty === '是') {
+                const propDate = document.getElementById('property_delivery_date').value;
+                if (!propDate) addFail(document.getElementById('property_date_display'));
+                const allSold = document.querySelector('input[name="property_all_sold"]:checked')?.value;
+                if (!allSold) addFail(document.querySelector('input[name="property_all_sold"]'));
+                const pFiles = document.getElementById('property_file_input');
+                if ((!pFiles || pFiles.files.length === 0) && countCloneAtts('property') === 0) addFail(pFiles);
+            }
+
+            if (failures.length > 0) {
+                e.preventDefault();
+                failures[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                failures.forEach(section => {
+                    section.classList.remove('field-flash');
+                    void section.offsetWidth;
+                    section.classList.add('field-flash');
+                    setTimeout(() => section.classList.remove('field-flash'), 1500);
+                });
+                return;
+            }
+
+            // 通过校验：预填模式解除 disabled 让值进入 POST
+            if (isPrefillMode) {
+                locKeys.forEach(loc => {
+                    setSelectDisabled(`${loc}_province`, false);
+                    setSelectDisabled(`${loc}_city`, false);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

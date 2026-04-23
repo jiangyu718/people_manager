@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}邮件模板{% endblock %}
+
+{% block extra_css %}
+<style>
+    th, td { font-size: 12px; }
+    .tpl-name { font-weight: 600; color: #1d4ed8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>✉️ 邮件模板</h5>
+    <a href="{{ url_for('email.template_new') }}" class="btn btn-success btn-sm">+ 新建模板</a>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if templates %}
+    <div class="table-responsive bg-white rounded-3 shadow-sm">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>模板名称</th>
+                    <th>邮件主题</th>
+                    <th>抄送</th>
+                    <th>附件数</th>
+                    <th>更新时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in templates %}
+                <tr>
+                    <td class="tpl-name">{{ t.name }}</td>
+                    <td>{{ t.subject }}</td>
+                    <td>{{ t.cc or '-' }}</td>
+                    <td>{{ t.attachments|length }}</td>
+                    <td>{{ t.updated_at.strftime('%Y-%m-%d %H:%M') if t.updated_at else '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('email.template_edit', id=t.id) }}" class="btn btn-sm btn-outline-primary py-0 px-2">编辑</a>
+                        <form method="POST" action="{{ url_for('email.template_delete', id=t.id) }}" style="display:inline;"
+                              onsubmit="return confirm('确定删除模板「{{ t.name }}」？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger py-0 px-2">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-3 shadow-sm p-5 text-center text-muted">
+        <div style="font-size:40px;">✉️</div>
+        <div class="mt-2">暂无邮件模板</div>
+        <a href="{{ url_for('email.template_new') }}" class="btn btn-primary btn-sm mt-3">创建第一个模板</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

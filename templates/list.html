@@ -1,0 +1,775 @@
+{% extends 'base.html' %}
+{% block title %}异地情况记录{% endblock %}
+
+{% block extra_css %}
+<style>
+    .th-inner { display: flex; align-items: center; justify-content: space-between; gap: 4px; white-space: nowrap; }
+    .filter-btn {
+        background: none; border: none; padding: 0 3px; cursor: pointer;
+        font-size: 10px; color: #adb5bd; flex-shrink: 0; line-height: 1;
+    }
+    .filter-btn:hover { color: #495057; }
+    .filter-btn.active { color: #0d6efd; }
+    .filter-dropdown {
+        position: fixed; z-index: 2000; background: #fff;
+        border: 1px solid #ced4da; border-radius: 8px;
+        box-shadow: 0 4px 18px rgba(0,0,0,.16); padding: 10px;
+        min-width: 200px; max-width: 280px;
+    }
+    .filter-search { width: 100%; margin-bottom: 8px; font-size: 13px; }
+    .filter-list { max-height: 200px; overflow-y: auto; margin-bottom: 8px; border: 1px solid #e9ecef; border-radius: 4px; padding: 4px; }
+    .filter-list label {
+        display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+        cursor: pointer; font-size: 13px; border-radius: 3px; margin: 0;
+    }
+    .filter-list label:hover { background: #e8f0fe; }
+    .filter-all-row {
+        display: flex; align-items: center; gap: 6px; padding: 4px 6px 8px;
+        cursor: pointer; font-size: 13px; font-weight: 600;
+        border-bottom: 1px solid #dee2e6; margin-bottom: 4px;
+    }
+    .filter-footer { display: flex; gap: 6px; justify-content: flex-end; }
+    .date-range-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 13px; }
+    .date-range-row input[type=date] { flex: 1; font-size: 12px; padding: 3px 5px; border: 1px solid #ced4da; border-radius: 4px; }
+    th { font-size: 12px; }
+    td { font-size: 12px; white-space: nowrap; }
+    .badge-yes { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+    .badge-no  { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 11px; }
+    .filtered-count { font-size: 13px; color: #6b7280; }
+    .attachment-menu { max-width: 320px; max-height: 280px; overflow-y: auto; }
+    .attachment-menu .dropdown-item {
+        white-space: normal; word-break: break-all;
+        font-size: 12px; padding: 6px 12px; line-height: 1.4;
+    }
+    .table-responsive { min-height: 420px; overflow-y: visible; }
+    /* 各列固定宽度；备注列(21)不设 width，动态占剩余空间 */
+    #personnel-table th:nth-child(1)  { width: 32px; }
+    #personnel-table th:nth-child(2)  { width: 100px; }
+    #personnel-table th:nth-child(3)  { width: 85px; }
+    #personnel-table th:nth-child(4)  { width: 65px; }
+    #personnel-table th:nth-child(5)  { width: 42px; }
+    #personnel-table th:nth-child(6)  { width: 90px; }
+    #personnel-table th:nth-child(7)  { width: 95px; }
+    #personnel-table th:nth-child(8)  { width: 90px; }
+    #personnel-table th:nth-child(9)  { width: 95px; }
+    #personnel-table th:nth-child(10) { width: 90px; }
+    #personnel-table th:nth-child(11) { width: 95px; }
+    #personnel-table th:nth-child(12) { width: 90px; }
+    #personnel-table th:nth-child(13) { width: 120px; }
+    #personnel-table th:nth-child(14) { width: 95px; }
+    #personnel-table th:nth-child(15) { width: 65px; }
+    #personnel-table th:nth-child(16) { width: 95px; }
+    #personnel-table th:nth-child(17) { width: 65px; }
+    #personnel-table th:nth-child(18) { width: 95px; }
+    #personnel-table th:nth-child(19) { width: 95px; }
+    #personnel-table th:nth-child(20) { width: 95px; }
+    #personnel-table th:nth-child(21) { min-width: 60px; }
+    #personnel-table th:nth-child(22) { width: 140px; }
+    #personnel-table th:nth-child(23) { width: 75px; }
+    /* 操作列：固定宽度，不受列宽持久化影响 */
+    #personnel-table th.col-actions,
+    #personnel-table td.col-actions {
+        width: 220px !important;
+        min-width: 220px !important;
+        max-width: 220px !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: nowrap;
+    }
+    #personnel-table td.col-actions .btn { margin-right: 2px; }
+    #personnel-table th.col-actions .col-resizer { display: none; }
+    /* 文本列：双击复制 */
+    #personnel-table td.dbl-copy { cursor: copy; }
+    #personnel-table td.dbl-copy:hover { background: #e0f2fe; }
+    /* 批量操作栏 */
+    .batch-bar {
+        display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+        background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+        margin-bottom: 10px; font-size: 13px;
+    }
+    .batch-bar.d-none { display: none !important; }
+    /* 备注列动态宽度，与其他列一致用省略号截断 */
+    td.notes-cell { max-width: none; }
+
+    /* 列宽调整 */
+    #personnel-table { table-layout: fixed; }
+    #personnel-table th { position: relative; padding-right: 10px; overflow: hidden; text-overflow: ellipsis; }
+    #personnel-table td { overflow: hidden; text-overflow: ellipsis; }
+    .col-resizer {
+        position: absolute; top: 0; right: 0;
+        width: 6px; height: 100%;
+        cursor: col-resize; user-select: none;
+        background: transparent; z-index: 3;
+    }
+    .col-resizer:hover { background: #93c5fd; }
+    .col-resizer.active { background: #3b82f6; }
+    body.col-resizing { cursor: col-resize !important; user-select: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>📋 异地情况记录</h5>
+    <a href="{{ url_for('personnel.add') }}" class="btn btn-success btn-sm">+ 添加记录</a>
+    <button id="cols-toggle-btn" class="btn btn-outline-secondary btn-sm" onclick="toggleColsPanel(event)">👁 列显示</button>
+    <button id="clear-filters-btn" class="btn btn-outline-danger btn-sm d-none" onclick="clearAllFilters()">✕ 清除筛选</button>
+    <span id="filtered-count" class="filtered-count ms-1"></span>
+    <div class="ms-auto d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" onclick="exportData('csv')">⬇ 导出 CSV</button>
+        <button class="btn btn-outline-success btn-sm" onclick="exportData('xlsx')">⬇ 导出 Excel</button>
+    </div>
+</div>
+<div class="content-body">
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- 批量操作栏 -->
+    <div id="batch-bar" class="batch-bar d-none">
+        <span id="batch-count" style="font-weight:600; color:#1d4ed8;">已选 0 条</span>
+        <button class="btn btn-sm btn-danger" onclick="batchDelete()">🗑 删除选中</button>
+        <button class="btn btn-sm btn-outline-primary" onclick="batchDownload()">⬇ 下载附件</button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="exportData('csv', true)">导出选中 CSV</button>
+        <button class="btn btn-sm btn-outline-success" onclick="exportData('xlsx', true)">导出选中 Excel</button>
+        <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="clearSelection()">取消选择</button>
+    </div>
+
+    <!-- 隐藏表单，用于批量删除 -->
+    <form id="batch-delete-form" method="POST" action="{{ url_for('personnel.bulk_delete') }}" style="display:none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="ids" id="batch-delete-ids">
+    </form>
+    <!-- 隐藏表单，用于批量下载附件 -->
+    <form id="batch-download-form" method="POST" action="{{ url_for('personnel.bulk_download') }}" style="display:none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="ids" id="batch-download-ids">
+    </form>
+
+    <div class="table-responsive bg-white rounded-3 shadow-sm">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0" id="personnel-table">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:32px; text-align:center;">
+                        <input type="checkbox" id="select-all" title="全选" onclick="toggleSelectAll(this)">
+                    </th>
+                    <th><div class="th-inner">人员类型<button class="filter-btn" data-col="1" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">员工编号<button class="filter-btn" data-col="2" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">姓名<button class="filter-btn" data-col="3" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">职级<button class="filter-btn" data-col="4" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">工作所在地<button class="filter-btn" data-col="5" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">工作所在地时间<button class="filter-btn" data-col="6" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">户口所在地<button class="filter-btn" data-col="7" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">户口所在地时间<button class="filter-btn" data-col="8" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">配偶常住地<button class="filter-btn" data-col="9" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">配偶常住地时间<button class="filter-btn" data-col="10" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">子女常住地<button class="filter-btn" data-col="11" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">是否在工作地购置房产<button class="filter-btn" data-col="12" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">房产交付日期<button class="filter-btn" data-col="13" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">是否全部售出<button class="filter-btn" data-col="14" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">过渡期截止<button class="filter-btn" data-col="15" data-type="date">▼</button></div></th>
+                    <th>附件</th>
+                    <th><div class="th-inner">异地开始时间<button class="filter-btn" data-col="17" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">异地结束时间<button class="filter-btn" data-col="18" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">是否符合异地条件<button class="filter-btn" data-col="19" data-type="list">▼</button></div></th>
+                    <th>备注</th>
+                    <th><div class="th-inner">创建时间<button class="filter-btn" data-col="21" data-type="date">▼</button></div></th>
+                    <th class="col-actions">操作</th>
+                </tr>
+            </thead>
+            <tbody id="data-tbody">
+                {% for p in personnels %}
+                <tr>
+                    <td style="text-align:center;">
+                        <input type="checkbox" class="row-cb" data-id="{{ p.id }}" onclick="onRowCheck()">
+                    </td>
+                    <td class="dbl-copy">{{ p.personnel_type }}</td>
+                    <td class="dbl-copy">{{ p.employee_id }}</td>
+                    <td class="dbl-copy">{{ p.name }}</td>
+                    <td class="dbl-copy">{{ p.rank if p.rank is not none else '-' }}</td>
+                    <td class="dbl-copy">{{ p.work_location }}</td>
+                    <td class="dbl-copy">{{ p.work_location_date or '-' }}</td>
+                    <td class="dbl-copy">{{ p.household_location }}</td>
+                    <td class="dbl-copy">{{ p.household_location_date or '-' }}</td>
+                    <td class="dbl-copy">{{ p.spouse_location or '-' }}</td>
+                    <td class="dbl-copy">{{ p.spouse_location_date or '-' }}</td>
+                    <td class="dbl-copy">{{ p.children_location or '-' }}</td>
+                    <td class="dbl-copy">{{ p.has_property }}</td>
+                    <td class="dbl-copy">{{ p.property_delivery_date or '-' }}</td>
+                    <td class="dbl-copy">{{ p.property_all_sold or '-' }}</td>
+                    <td class="dbl-copy">{{ p.transition_end_date or '-' }}</td>
+                    <td>
+                        {% if p.attachments %}
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-primary dropdown-toggle att-dd-btn" type="button" data-bs-toggle="dropdown">
+                                    {{ p.attachments|length }}个文件
+                                </button>
+                                <ul class="dropdown-menu attachment-menu">
+                                    {% for att in p.attachments %}
+                                        <li><a class="dropdown-item" href="{{ url_for('public.get_file', file_id=att.id) }}" target="_blank" title="{{ att.filename }}">{{ att.filename }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td class="dbl-copy">{{ p.remote_start_date or '-' }}</td>
+                    <td class="dbl-copy">{{ p.remote_end_date or '-' }}</td>
+                    <td class="dbl-copy">
+                        {% if p.is_remote_qualified %}
+                            <span class="badge-yes">是</span>
+                        {% else %}
+                            <span class="badge-no">否</span>
+                        {% endif %}
+                    </td>
+                    <td class="dbl-copy notes-cell">{{ p.notes or '-' }}</td>
+                    <td class="dbl-copy">{{ p.created_at.strftime('%Y-%m-%d %H:%M:%S') if p.created_at else '-' }}</td>
+                    <td class="col-actions">
+                        <a href="{{ url_for('personnel.edit', id=p.id) }}" class="btn btn-sm btn-outline-primary py-0 px-2">编辑</a>
+                        <a href="{{ url_for('personnel.clone', id=p.id) }}" class="btn btn-sm btn-outline-success py-0 px-2" title="基于此记录新增">复制</a>
+                        <form method="POST" action="{{ url_for('personnel.delete', id=p.id) }}" style="display:inline;"
+                              onsubmit="return confirm('确定要删除吗？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger py-0 px-2">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(() => {
+    const tbody = document.getElementById('data-tbody');
+    const allRows = Array.from(tbody.rows);
+    const totalCount = allRows.length;
+
+    // ── 列宽拖拽调整（右边缘 6px 区域；双击复位；持久化到 localStorage） ──
+    const WIDTH_LS_KEY = 'cmss.list.colWidths';
+    function loadColWidths() {
+        try { return JSON.parse(localStorage.getItem(WIDTH_LS_KEY)) || {}; }
+        catch { return {}; }
+    }
+    function saveColWidths(v) { localStorage.setItem(WIDTH_LS_KEY, JSON.stringify(v)); }
+    function thLabel(th) {
+        const inner = th.querySelector('.th-inner');
+        if (inner) {
+            return [...inner.childNodes].filter(n => n.nodeType === 3)
+                .map(n => n.textContent.trim()).join('').trim();
+        }
+        return th.textContent.trim();
+    }
+    (function wireColumnResize() {
+        const table = document.getElementById('personnel-table');
+        if (!table) return;
+        const ths = Array.from(table.querySelectorAll('thead th'));
+        const saved = loadColWidths();
+        // 一次性清理：以前误存的"操作"列宽度会把按钮挤出，直接移除
+        if (saved['操作']) { delete saved['操作']; saveColWidths(saved); }
+        // 初始化：先按自然宽度锁定，再把已保存的覆盖；操作列固定由 CSS 控制，JS 不参与
+        ths.forEach(th => {
+            if (th.classList.contains('col-actions')) return;
+            const w = th.offsetWidth;
+            th.style.width = w + 'px';
+        });
+        ths.forEach(th => {
+            if (th.classList.contains('col-actions')) return;
+            const label = thLabel(th);
+            if (saved[label]) th.style.width = saved[label] + 'px';
+        });
+        // 为每个 th 追加右边缘拖拽把手（操作列除外，避免用户再次调窄）
+        ths.forEach(th => {
+            if (th.classList.contains('col-actions')) return;
+            const handle = document.createElement('div');
+            handle.className = 'col-resizer';
+            handle.title = '拖动调整列宽；双击恢复默认';
+            th.appendChild(handle);
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                const startX = e.pageX;
+                const startW = th.offsetWidth;
+                handle.classList.add('active');
+                document.body.classList.add('col-resizing');
+                function move(ev) {
+                    const w = Math.max(40, startW + (ev.pageX - startX));
+                    th.style.width = w + 'px';
+                }
+                function up() {
+                    handle.classList.remove('active');
+                    document.body.classList.remove('col-resizing');
+                    document.removeEventListener('mousemove', move);
+                    document.removeEventListener('mouseup', up);
+                    const widths = loadColWidths();
+                    widths[thLabel(th)] = parseInt(th.style.width, 10);
+                    saveColWidths(widths);
+                }
+                document.addEventListener('mousemove', move);
+                document.addEventListener('mouseup', up);
+            });
+            // 双击复位到内容自然宽度
+            handle.addEventListener('dblclick', (e) => {
+                e.stopPropagation();
+                const widths = loadColWidths();
+                delete widths[thLabel(th)];
+                saveColWidths(widths);
+                th.style.width = '';
+                requestAnimationFrame(() => { th.style.width = th.offsetWidth + 'px'; });
+            });
+        });
+    })();
+    // 暴露给列显示面板做"重置所有列宽"用
+    window._resetAllColWidths = function() {
+        localStorage.removeItem(WIDTH_LS_KEY);
+        document.querySelectorAll('#personnel-table thead th').forEach(th => {
+            if (th.classList.contains('col-actions')) return;
+            th.style.width = '';
+        });
+        requestAnimationFrame(() => {
+            document.querySelectorAll('#personnel-table thead th').forEach(th => {
+                if (th.classList.contains('col-actions')) return;
+                th.style.width = th.offsetWidth + 'px';
+            });
+        });
+    };
+
+    // ── 列显示 / 隐藏（按列头文字持久化到 localStorage）──
+    // 跳过 col 0（复选框）和最后一列（操作）——这两列始终显示
+    const COLS_LS_KEY = 'cmss.list.visibleCols';
+    const theadThs = document.querySelectorAll('#personnel-table thead th');
+
+    function getColMeta() {
+        const out = [];
+        theadThs.forEach((th, i) => {
+            if (i === 0 || i === theadThs.length - 1) return;
+            const inner = th.querySelector('.th-inner');
+            const text = inner
+                ? [...inner.childNodes].filter(n => n.nodeType === 3)
+                    .map(n => n.textContent.trim()).join('').trim()
+                : th.textContent.trim();
+            out.push({ idx: i, label: text });
+        });
+        return out;
+    }
+
+    function loadColVis() {
+        try { return JSON.parse(localStorage.getItem(COLS_LS_KEY)) || {}; }
+        catch { return {}; }
+    }
+    function saveColVis(v) { localStorage.setItem(COLS_LS_KEY, JSON.stringify(v)); }
+
+    function applyColVis() {
+        const v = loadColVis();
+        getColMeta().forEach(col => {
+            const hide = v[col.label] === false;
+            theadThs[col.idx].style.display = hide ? 'none' : '';
+            allRows.forEach(row => {
+                const td = row.cells[col.idx];
+                if (td) td.style.display = hide ? 'none' : '';
+            });
+        });
+    }
+
+    let colsPanel = null;
+    function closeColsPanel() {
+        if (colsPanel) { colsPanel.remove(); colsPanel = null; }
+    }
+    window.toggleColsPanel = function(e) {
+        e.stopPropagation();
+        if (colsPanel) { closeColsPanel(); return; }
+        const btn = document.getElementById('cols-toggle-btn');
+        const vis = loadColVis();
+
+        const panel = document.createElement('div');
+        panel.className = 'filter-dropdown';
+        panel.style.minWidth = '220px';
+
+        const title = document.createElement('div');
+        title.style.cssText = 'font-size:12px;font-weight:600;margin-bottom:8px;color:#374151;';
+        title.textContent = '选择要显示的列';
+        panel.appendChild(title);
+
+        const list = document.createElement('div');
+        list.className = 'filter-list';
+        list.style.maxHeight = '340px';
+        getColMeta().forEach(col => {
+            const lbl = document.createElement('label');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = vis[col.label] !== false;
+            cb.addEventListener('change', () => {
+                const cur = loadColVis();
+                cur[col.label] = cb.checked;
+                saveColVis(cur);
+                applyColVis();
+            });
+            lbl.appendChild(cb);
+            lbl.append(' ' + (col.label || '(未命名)'));
+            list.appendChild(lbl);
+        });
+        panel.appendChild(list);
+
+        const footer = document.createElement('div');
+        footer.className = 'filter-footer';
+        const resetWidthsBtn = document.createElement('button');
+        resetWidthsBtn.className = 'btn btn-sm btn-outline-secondary';
+        resetWidthsBtn.textContent = '重置列宽';
+        resetWidthsBtn.title = '清除所有拖拽调整过的列宽';
+        resetWidthsBtn.addEventListener('click', () => {
+            if (window._resetAllColWidths) window._resetAllColWidths();
+        });
+        footer.appendChild(resetWidthsBtn);
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn btn-sm btn-outline-secondary';
+        resetBtn.textContent = '全部显示';
+        resetBtn.addEventListener('click', () => {
+            localStorage.removeItem(COLS_LS_KEY);
+            applyColVis();
+            panel.querySelectorAll('.filter-list input').forEach(c => c.checked = true);
+        });
+        footer.appendChild(resetBtn);
+        panel.appendChild(footer);
+
+        panel.addEventListener('click', ev => ev.stopPropagation());
+        document.body.appendChild(panel);
+        const r = btn.getBoundingClientRect();
+        panel.style.top = (r.bottom + window.scrollY + 4) + 'px';
+        panel.style.left = (r.left + window.scrollX) + 'px';
+        requestAnimationFrame(() => {
+            const pr = panel.getBoundingClientRect();
+            if (pr.right > window.innerWidth - 8) {
+                panel.style.left = Math.max(8, window.innerWidth - pr.width - 8 + window.scrollX) + 'px';
+            }
+        });
+        colsPanel = panel;
+        setTimeout(() => document.addEventListener('click', onDocClickForCols), 0);
+    };
+    function onDocClickForCols(e) {
+        if (colsPanel && !colsPanel.contains(e.target)) {
+            closeColsPanel();
+            document.removeEventListener('click', onDocClickForCols);
+        }
+    }
+    applyColVis();
+
+    const filters = new Map();
+    const dateRanges = new Map();
+    let activeDropdown = null;
+    let activeColIdx = -1;
+
+    function getCellText(row, ci) { return (row.cells[ci]?.textContent ?? '').trim(); }
+
+    function getUniqueValues(ci) {
+        const vals = new Set();
+        allRows.forEach(r => vals.add(getCellText(r, ci)));
+        return [...vals].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+    }
+
+    function cellMatchesDate(row, ci, range) {
+        const txt = getCellText(row, ci);
+        if (txt === '-' || !txt) return (!range.from && !range.to);
+        const d = txt.substring(0, 10);
+        if (range.from && d < range.from) return false;
+        if (range.to   && d > range.to)   return false;
+        return true;
+    }
+
+    function applyFilters() {
+        let visible = 0;
+        allRows.forEach(row => {
+            let show = true;
+            for (const [ci, allowed] of filters) {
+                if (!allowed.has(getCellText(row, ci))) { show = false; break; }
+            }
+            if (show) {
+                for (const [ci, range] of dateRanges) {
+                    if (!cellMatchesDate(row, ci, range)) { show = false; break; }
+                }
+            }
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+        updateUI(visible);
+    }
+
+    function hasActiveFilters() { return filters.size > 0 || dateRanges.size > 0; }
+
+    function updateUI(visible) {
+        document.getElementById('clear-filters-btn').classList.toggle('d-none', !hasActiveFilters());
+        const countEl = document.getElementById('filtered-count');
+        countEl.textContent = hasActiveFilters() ? `已筛选：${visible} / ${totalCount} 条` : (totalCount ? `共 ${totalCount} 条` : '');
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            const ci = parseInt(btn.dataset.col);
+            btn.classList.toggle('active', filters.has(ci) || dateRanges.has(ci));
+        });
+    }
+
+    window.clearAllFilters = () => { filters.clear(); dateRanges.clear(); applyFilters(); closeDropdown(); };
+
+    function closeDropdown() {
+        if (activeDropdown) { activeDropdown.remove(); activeDropdown = null; activeColIdx = -1; }
+    }
+
+    function positionDropdown(dd, btn) {
+        document.body.appendChild(dd);
+        const rect = btn.getBoundingClientRect();
+        dd.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+        dd.style.left = (rect.left + window.scrollX) + 'px';
+        requestAnimationFrame(() => {
+            const r = dd.getBoundingClientRect();
+            if (r.right > window.innerWidth - 8)
+                dd.style.left = Math.max(8, window.innerWidth - r.width - 8 + window.scrollX) + 'px';
+        });
+    }
+
+    function openDateRangeDropdown(btn, ci) {
+        if (activeColIdx === ci) { closeDropdown(); return; }
+        closeDropdown(); activeColIdx = ci;
+        const current = dateRanges.get(ci) || {from: '', to: ''};
+        const dd = document.createElement('div');
+        dd.className = 'filter-dropdown'; activeDropdown = dd;
+        dd.innerHTML = `
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:#374151;">日期范围筛选</div>
+            <div class="date-range-row"><span style="width:28px;flex-shrink:0;">从</span><input type="date" id="_dr_from" value="${current.from}"></div>
+            <div class="date-range-row"><span style="width:28px;flex-shrink:0;">到</span><input type="date" id="_dr_to" value="${current.to}"></div>
+            <div class="filter-footer">
+                <button class="btn btn-sm btn-outline-secondary" id="_dr_clr">清空</button>
+                <button class="btn btn-sm btn-primary" id="_dr_ok">确定</button>
+            </div>`;
+        dd.addEventListener('click', e => e.stopPropagation());
+        dd.querySelector('#_dr_clr').addEventListener('click', () => {
+            dateRanges.delete(ci); applyFilters(); closeDropdown();
+        });
+        dd.querySelector('#_dr_ok').addEventListener('click', () => {
+            const f = dd.querySelector('#_dr_from').value;
+            const t = dd.querySelector('#_dr_to').value;
+            if (!f && !t) dateRanges.delete(ci);
+            else dateRanges.set(ci, {from: f, to: t});
+            applyFilters(); closeDropdown();
+        });
+        positionDropdown(dd, btn);
+    }
+
+    function openCheckboxDropdown(btn, ci) {
+        if (activeColIdx === ci) { closeDropdown(); return; }
+        closeDropdown(); activeColIdx = ci;
+        const uniqueVals = getUniqueValues(ci);
+        const pending = filters.get(ci) ? new Set(filters.get(ci)) : new Set(uniqueVals);
+        const dd = document.createElement('div');
+        dd.className = 'filter-dropdown'; activeDropdown = dd;
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text'; searchInput.className = 'form-control form-control-sm filter-search';
+        searchInput.placeholder = '搜索值...'; dd.appendChild(searchInput);
+
+        const allRow = document.createElement('div'); allRow.className = 'filter-all-row';
+        const allCb = document.createElement('input'); allCb.type = 'checkbox'; allCb.id = '_fcb';
+        const allLbl = document.createElement('label'); allLbl.htmlFor = '_fcb'; allLbl.textContent = '全选'; allLbl.style.cursor = 'pointer';
+        allRow.appendChild(allCb); allRow.appendChild(allLbl); dd.appendChild(allRow);
+
+        const list = document.createElement('div'); list.className = 'filter-list'; dd.appendChild(list);
+
+        function refreshAllCb() {
+            const shown = uniqueVals.filter(v => v.toLowerCase().includes(searchInput.value.toLowerCase()));
+            allCb.checked = shown.every(v => pending.has(v));
+            allCb.indeterminate = !allCb.checked && shown.some(v => pending.has(v));
+        }
+        function renderList(q) {
+            list.innerHTML = '';
+            uniqueVals.filter(v => v.toLowerCase().includes(q.toLowerCase())).forEach(val => {
+                const lbl = document.createElement('label');
+                const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = pending.has(val);
+                cb.addEventListener('change', () => { if (cb.checked) pending.add(val); else pending.delete(val); refreshAllCb(); });
+                lbl.appendChild(cb); lbl.append(' ' + (val || '(空)')); list.appendChild(lbl);
+            });
+            refreshAllCb();
+        }
+        renderList('');
+        searchInput.addEventListener('input', () => renderList(searchInput.value));
+        allCb.addEventListener('change', () => {
+            const shown = uniqueVals.filter(v => v.toLowerCase().includes(searchInput.value.toLowerCase()));
+            if (allCb.checked) shown.forEach(v => pending.add(v)); else shown.forEach(v => pending.delete(v));
+            renderList(searchInput.value);
+        });
+
+        const footer = document.createElement('div'); footer.className = 'filter-footer';
+        const cancelBtn = document.createElement('button'); cancelBtn.className = 'btn btn-sm btn-outline-secondary'; cancelBtn.textContent = '取消'; cancelBtn.addEventListener('click', closeDropdown);
+        const confirmBtn = document.createElement('button'); confirmBtn.className = 'btn btn-sm btn-primary'; confirmBtn.textContent = '确定';
+        confirmBtn.addEventListener('click', () => {
+            if (pending.size === 0 || pending.size === uniqueVals.length) filters.delete(ci);
+            else filters.set(ci, new Set(pending));
+            applyFilters(); closeDropdown();
+        });
+        footer.appendChild(cancelBtn); footer.appendChild(confirmBtn); dd.appendChild(footer);
+        dd.addEventListener('click', e => e.stopPropagation());
+        positionDropdown(dd, btn);
+    }
+
+    document.querySelectorAll('.filter-btn').forEach(btn =>
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const ci = parseInt(btn.dataset.col);
+            if (btn.dataset.type === 'date') openDateRangeDropdown(btn, ci);
+            else openCheckboxDropdown(btn, ci);
+        }));
+    document.addEventListener('click', e => { if (activeDropdown && !activeDropdown.contains(e.target)) closeDropdown(); });
+    updateUI(totalCount);
+
+    // 附件下拉：用 fixed 定位策略，避免被 table-responsive 的 overflow 裁剪
+    document.querySelectorAll('.att-dd-btn').forEach(btn => {
+        new bootstrap.Dropdown(btn, { popperConfig: { strategy: 'fixed' } });
+    });
+
+    // 双击文本列复制（事件委托）
+    (function() {
+        async function copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0;';
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); } catch {}
+                ta.remove();
+            }
+        }
+        tbody.addEventListener('dblclick', async e => {
+            const td = e.target.closest('td.dbl-copy');
+            if (!td) return;
+            const badge = td.querySelector('.badge-yes, .badge-no');
+            const text = (badge ? badge.textContent : td.textContent).trim();
+            if (!text || text === '-') return;
+            await copyToClipboard(text);
+            const orig = td.style.background;
+            td.style.background = '#bbf7d0';
+            const tip = document.createElement('span');
+            tip.textContent = '已复制';
+            tip.style.cssText = 'margin-left:6px; color:#065f46; font-size:11px;';
+            td.appendChild(tip);
+            setTimeout(() => { td.style.background = orig; tip.remove(); }, 900);
+        });
+        tbody.addEventListener('mousedown', e => {
+            if (e.detail > 1 && e.target.closest('td.dbl-copy')) e.preventDefault();
+        });
+    })();
+
+    // ── 批量选择 ──
+    window.toggleSelectAll = function(cb) {
+        const visibleCbs = allRows
+            .filter(r => r.style.display !== 'none')
+            .map(r => r.querySelector('.row-cb'));
+        visibleCbs.forEach(c => { if (c) c.checked = cb.checked; });
+        updateBatchBar();
+    };
+
+    window.onRowCheck = function() {
+        const all = Array.from(document.querySelectorAll('.row-cb'));
+        const visible = all.filter(c => c.closest('tr').style.display !== 'none');
+        const allChecked = visible.length > 0 && visible.every(c => c.checked);
+        document.getElementById('select-all').checked = allChecked;
+        document.getElementById('select-all').indeterminate = !allChecked && visible.some(c => c.checked);
+        updateBatchBar();
+    };
+
+    function getCheckedIds() {
+        return Array.from(document.querySelectorAll('.row-cb:checked')).map(c => c.dataset.id);
+    }
+
+    function updateBatchBar() {
+        const ids = getCheckedIds();
+        const bar = document.getElementById('batch-bar');
+        if (ids.length > 0) {
+            bar.classList.remove('d-none');
+            document.getElementById('batch-count').textContent = `已选 ${ids.length} 条`;
+        } else {
+            bar.classList.add('d-none');
+        }
+    }
+
+    window.clearSelection = function() {
+        document.querySelectorAll('.row-cb').forEach(c => c.checked = false);
+        document.getElementById('select-all').checked = false;
+        document.getElementById('select-all').indeterminate = false;
+        updateBatchBar();
+    };
+
+    window.batchDelete = function() {
+        const ids = getCheckedIds();
+        if (ids.length === 0) return;
+        if (!confirm(`确定删除选中的 ${ids.length} 条记录吗？`)) return;
+        document.getElementById('batch-delete-ids').value = ids.join(',');
+        document.getElementById('batch-delete-form').submit();
+    };
+
+    window.batchDownload = function() {
+        const ids = getCheckedIds();
+        if (ids.length === 0) { alert('请先选择记录'); return; }
+        document.getElementById('batch-download-ids').value = ids.join(',');
+        document.getElementById('batch-download-form').submit();
+    };
+
+    // ── 导出 ──
+    window.exportData = function(fmt, selectedOnly) {
+        const headers = [];
+        document.querySelectorAll('#personnel-table thead th').forEach(th => {
+            const inner = th.querySelector('.th-inner');
+            if (inner) {
+                headers.push([...inner.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent.trim()).join('').trim());
+            } else {
+                headers.push(th.textContent.trim());
+            }
+        });
+        // 跳过：checkbox(0), 附件列, 操作(最后列) —— 附件按表头文字查索引，避免列顺序调整后导出错位
+        const attIdx = headers.findIndex(h => h === '附件');
+        const skipCols = new Set([0, headers.length - 1]);
+        if (attIdx >= 0) skipCols.add(attIdx);
+
+        const checkedIds = selectedOnly ? new Set(getCheckedIds()) : null;
+        const exportHeaders = headers.filter((_, i) => !skipCols.has(i));
+        const exportRows = [];
+        allRows.forEach(row => {
+            if (row.style.display === 'none') return;
+            if (checkedIds) {
+                const cb = row.querySelector('.row-cb');
+                if (!cb || !checkedIds.has(cb.dataset.id)) return;
+            }
+            const cells = Array.from(row.cells);
+            const rowData = cells
+                .filter((_, i) => !skipCols.has(i))
+                .map(td => {
+                    const badge = td.querySelector('.badge-yes, .badge-no');
+                    return badge ? badge.textContent.trim() : td.textContent.trim();
+                });
+            exportRows.push(rowData);
+        });
+
+        if (fmt === 'csv') {
+            const lines = [exportHeaders, ...exportRows].map(row =>
+                row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+            );
+            const blob = new Blob(['﻿' + lines.join('\r\n')], {type: 'text/csv;charset=utf-8;'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `异地情况记录_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+        } else {
+            const ws = XLSX.utils.aoa_to_sheet([exportHeaders, ...exportRows]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '异地情况记录');
+            XLSX.writeFile(wb, `异地情况记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+    };
+})();
+</script>
+{% endblock %}

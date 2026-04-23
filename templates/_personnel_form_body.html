@@ -1,0 +1,215 @@
+{# 人员异地记录表单 — 添加/编辑 共享表单主体。
+   可选 context: personnel (edit 下传入，含已有附件)。#}
+<div class="form-section">
+    <label class="form-label"><span class="required-star">*</span>1. 人员类型</label>
+    {{ form.personnel_type(class="form-select") }}
+</div>
+
+<div class="row g-3 form-section">
+    <div class="col-sm-6">
+        <label class="form-label"><span class="required-star">*</span>2. 员工编号</label>
+        {{ form.employee_id(class="form-control") }}
+    </div>
+    <div class="col-sm-6">
+        <label class="form-label"><span class="required-star">*</span>3. 姓名</label>
+        {{ form.name(class="form-control") }}
+    </div>
+</div>
+
+<div class="form-section">
+    <label class="form-label"><span class="required-star">*</span>4. 职级</label>
+    {{ form.rank(class="form-control", type="number", min="1", step="1", style="max-width:160px;", oninput="this.value=this.value.replace(/[^0-9]/g,'')") }}
+    <div class="mt-2">
+        <label class="form-label" style="font-size:13px; font-weight:500;">职级调整时间 <span class="text-muted fw-normal">(选填)</span></label>
+        <div class="date-picker-container" id="rank-date-cal-wrap">
+            <input type="text" class="form-control date-display-input" id="rank_date_display" readonly placeholder="请选择日期" style="max-width:200px;">
+        </div>
+        <input type="hidden" name="rank_date" id="rank_date">
+    </div>
+</div>
+
+<div class="form-section">
+    <label class="form-label"><span class="required-star">*</span>5. 工作所在地</label>
+    <div class="d-flex gap-2">
+        {{ form.work_province(class="form-select", id="work_province") }}
+        {{ form.work_city(class="form-select", id="work_city") }}
+    </div>
+    <button type="button" class="loc-clear-btn" onclick="clearLoc('work')">清除填写</button>
+    <div class="mt-2">
+        <label class="form-label" style="font-size:13px; font-weight:500;">工作所在地时间 <span class="text-muted fw-normal">(选填)</span></label>
+        <div class="date-picker-container" id="work-loc-date-wrap">
+            <input type="text" class="form-control date-display-input" id="work_location_date_display" readonly placeholder="请选择日期">
+        </div>
+        <input type="hidden" name="work_location_date" id="work_location_date">
+    </div>
+</div>
+
+<div class="form-section">
+    <label class="form-label"><span class="required-star">*</span>6. 户口所在地</label>
+    <div class="d-flex gap-2">
+        {{ form.household_province(class="form-select", id="household_province") }}
+        {{ form.household_city(class="form-select", id="household_city") }}
+    </div>
+    <button type="button" class="loc-clear-btn" onclick="clearLoc('household')">清除填写</button>
+    <div class="mt-2">
+        <label class="form-label" style="font-size:13px; font-weight:500;">户口所在地时间 <span class="text-muted fw-normal">(选填)</span></label>
+        <div class="date-picker-container" id="household-loc-date-wrap">
+            <input type="text" class="form-control date-display-input" id="household_location_date_display" readonly placeholder="请选择日期">
+        </div>
+        <input type="hidden" name="household_location_date" id="household_location_date">
+    </div>
+    <div class="mt-2 p-2" style="background:#f0f9ff; border:1px dashed #93c5fd; border-radius:6px;">
+        <label class="form-label" style="font-size:13px; font-weight:500;"><span class="required-star">*</span>户口本材料上传 <span class="text-muted fw-normal">(需上传：户口本首页、个人页)</span></label>
+        {% if personnel %}
+            {% set household_atts = personnel.attachments | selectattr('category','equalto','household') | list %}
+            {% if household_atts %}
+            <div class="mb-2 existing-att-list" data-list="household" style="font-size:12px;">
+                <div class="text-success fw-bold mb-1">已上传：</div>
+                {% for a in household_atts %}
+                <div class="existing-att-row d-flex align-items-center gap-2" data-att-id="{{ a.id }}">
+                    <span>📎</span>
+                    <a href="{{ url_for('public.get_file', file_id=a.id) }}" target="_blank" style="flex:1; word-break:break-all;">{{ a.filename }}</a>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                            onclick="deleteAttachment({{ a.id }}, this)">删除</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% elif clone_src is defined and clone_src %}
+            {% set household_atts = clone_src.attachments | selectattr('category','equalto','household') | list %}
+            {% if household_atts %}
+            <div class="mb-2 clone-att-preview" style="font-size:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:4px; padding:8px;">
+                <div style="color:#166534; font-weight:600; margin-bottom:4px;">📋 将复制以下附件（可移除）：</div>
+                {% for a in household_atts %}
+                <div class="clone-att-row d-flex align-items-center gap-2" data-att-id="{{ a.id }}">
+                    <span>📎</span>
+                    <span style="flex:1; word-break:break-all; color:#374151;">{{ a.filename }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                            onclick="removeCloneAtt({{ a.id }}, this)">移除</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endif %}
+        <input type="file" name="household_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.rar,.zip,.gz" multiple id="household_file_input">
+        <small class="text-muted">支持 PDF/JPG/PNG/RAR/ZIP/GZIP，可多选{% if personnel %}；新上传会追加{% endif %}{% if clone_src is defined and clone_src %}；可追加新文件{% endif %}</small>
+        <div id="household_file_status" class="mt-2" style="font-size:12px;"></div>
+    </div>
+</div>
+
+<div class="form-section">
+    <label class="form-label">7. 配偶常住地 <span class="text-muted fw-normal">(选填)</span></label>
+    <div class="d-flex gap-2">
+        {{ form.spouse_province(class="form-select", id="spouse_province") }}
+        {{ form.spouse_city(class="form-select", id="spouse_city") }}
+    </div>
+    <button type="button" class="loc-clear-btn" onclick="clearLoc('spouse')">清除填写</button>
+    <div class="mt-2">
+        <label class="form-label" style="font-size:13px; font-weight:500;">配偶常住地时间 <span class="text-muted fw-normal">(选填)</span></label>
+        <div class="date-picker-container" id="spouse-loc-date-wrap">
+            <input type="text" class="form-control date-display-input" id="spouse_location_date_display" readonly placeholder="请选择日期">
+        </div>
+        <input type="hidden" name="spouse_location_date" id="spouse_location_date">
+    </div>
+</div>
+
+<div class="form-section">
+    <label class="form-label">8. 子女常住地 <span class="text-muted fw-normal">(选填)</span></label>
+    <div class="d-flex gap-2">
+        {{ form.children_province(class="form-select", id="children_province") }}
+        {{ form.children_city(class="form-select", id="children_city") }}
+    </div>
+    <button type="button" class="loc-clear-btn" onclick="clearLoc('children')">清除填写</button>
+</div>
+
+<div class="form-section">
+    <label class="form-label"><span class="required-star">*</span>9. 是否在工作地购置房产</label>
+    <div class="d-flex gap-4">
+        <label class="d-flex align-items-center gap-2" style="cursor:pointer;">
+            <input type="radio" name="has_property" value="是" onclick="togglePropertyUpload(true)"> 是
+        </label>
+        <label class="d-flex align-items-center gap-2" style="cursor:pointer;">
+            <input type="radio" name="has_property" value="否" onclick="togglePropertyUpload(false)"> 否
+        </label>
+    </div>
+</div>
+
+<div id="property-section" style="display: none;">
+    <div class="form-section">
+        <label class="form-label"><span class="required-star">*</span>房产交付日期</label>
+        <div class="date-picker-container" id="property-cal-wrap">
+            <input type="text" class="form-control date-display-input" id="property_date_display" readonly placeholder="请选择日期">
+        </div>
+        <input type="hidden" name="property_delivery_date" id="property_delivery_date">
+    </div>
+    <div class="form-section">
+        <label class="form-label"><span class="required-star">*</span>在工作地购置房产是否全部售出</label>
+        {{ form.property_all_sold(class="form-select", style="max-width:200px;") }}
+    </div>
+    <div class="form-section p-2" style="background:#fef9c3; border:1px dashed #eab308; border-radius:6px;">
+        <label class="form-label" style="font-size:13px; font-weight:500;"><span class="required-star">*</span>房产材料上传 <span class="text-muted fw-normal">(需上传：房产证 或 购房合同)</span></label>
+        {% if personnel %}
+            {% set prop_atts = personnel.attachments | selectattr('category','equalto','property') | list %}
+            {% if prop_atts %}
+            <div class="mb-2 existing-att-list" data-list="property" style="font-size:12px;">
+                <div class="text-success fw-bold mb-1">已上传：</div>
+                {% for a in prop_atts %}
+                <div class="existing-att-row d-flex align-items-center gap-2" data-att-id="{{ a.id }}">
+                    <span>📎</span>
+                    <a href="{{ url_for('public.get_file', file_id=a.id) }}" target="_blank" style="flex:1; word-break:break-all;">{{ a.filename }}</a>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                            onclick="deleteAttachment({{ a.id }}, this)">删除</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% elif clone_src is defined and clone_src %}
+            {% set prop_atts = clone_src.attachments | selectattr('category','equalto','property') | list %}
+            {% if prop_atts %}
+            <div class="mb-2 clone-att-preview" style="font-size:12px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:4px; padding:8px;">
+                <div style="color:#166534; font-weight:600; margin-bottom:4px;">📋 将复制以下附件（可移除）：</div>
+                {% for a in prop_atts %}
+                <div class="clone-att-row d-flex align-items-center gap-2" data-att-id="{{ a.id }}">
+                    <span>📎</span>
+                    <span style="flex:1; word-break:break-all; color:#374151;">{{ a.filename }}</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2"
+                            onclick="removeCloneAtt({{ a.id }}, this)">移除</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endif %}
+        <input type="file" name="property_contract" class="form-control" accept=".pdf,.jpg,.jpeg,.png,.rar,.zip,.gz" multiple id="property_file_input">
+        <small class="text-muted">支持 PDF/JPG/PNG/RAR/ZIP/GZIP 格式，可上传多个文件{% if personnel %}；新上传会追加{% endif %}{% if clone_src is defined and clone_src %}；可追加新文件{% endif %}</small>
+        <div id="property_file_status" class="mt-2" style="font-size:12px;"></div>
+    </div>
+</div>
+
+<div class="form-section">
+    <label class="form-label">10. 异地开始时间 <span class="text-muted fw-normal">(选填)</span></label>
+    <div class="date-picker-container" id="remote-cal-wrap">
+        <input type="text" class="form-control date-display-input" id="remote_date_display" readonly placeholder="请选择日期">
+    </div>
+    <input type="hidden" name="remote_start_date" id="remote_start_date">
+</div>
+
+<div class="form-section">
+    <label class="form-label">11. 异地结束时间 <span class="text-muted fw-normal">(选填，管理员填写)</span></label>
+    <div class="date-picker-container" id="remote-end-cal-wrap">
+        <input type="text" class="form-control date-display-input" id="remote_end_date_display" readonly placeholder="请选择日期">
+    </div>
+    <input type="hidden" name="remote_end_date" id="remote_end_date">
+</div>
+
+<div class="form-section">
+    <label class="form-label">备注 <span class="text-muted fw-normal">(选填，管理员填写)</span></label>
+    {{ form.notes(class="form-control", rows=3, placeholder="管理员备注...") }}
+</div>
+
+<div class="form-section">
+    <label class="form-label">创建时间 <span class="text-muted fw-normal">(选填，修改后影响记录排序)</span></label>
+    <div class="date-picker-container" id="created-at-cal-wrap">
+        <input type="text" class="form-control date-display-input" id="created_at_edit_display" readonly placeholder="请选择日期（留空则保持不变）">
+    </div>
+    <input type="hidden" name="created_at_edit" id="created_at_edit">
+</div>

@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}生成记录链接{% endblock %}
+
+{% block extra_css %}
+<style>
+    .link-box {
+        background: #f8faff; border: 1px solid #bfdbfe; border-radius: 8px;
+        padding: 14px 16px; display: flex; align-items: center; gap: 10px;
+        font-family: monospace; font-size: 13px; word-break: break-all; color: #1e40af;
+    }
+    .link-box input { border: none; background: none; flex: 1; outline: none; font-family: inherit; font-size: inherit; color: inherit; }
+    .emp-result { border: 1px solid #e5e7eb; border-radius: 6px; margin-top: 10px; overflow: hidden; }
+    .emp-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+    .emp-row:last-child { border-bottom: none; }
+    .emp-row:hover { background: #f8faff; }
+    .emp-id { font-weight: 600; color: #1d4ed8; min-width: 90px; }
+    .emp-name { flex: 1; }
+    .emp-email { color: #6b7280; font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>🔗 生成异地情况记录链接</h5>
+</div>
+<div class="content-body">
+
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm p-4" style="max-width: 620px;">
+
+        {% if generated %}
+        <!-- 已生成链接 -->
+        <p class="mb-2" style="font-size:14px;">链接已生成，将其发送给该员工填写（每个链接仅限提交一次）：</p>
+        <div class="link-box mb-3">
+            <input type="text" value="{{ form_url }}" id="form-url-input" readonly>
+            <button class="btn btn-sm btn-primary flex-shrink-0" onclick="copyUrl()">复制</button>
+        </div>
+        <div id="copy-tip" class="mb-3 text-success" style="font-size:13px; display:none;">✓ 已复制到剪贴板</div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('public.generate_form') }}" class="btn btn-outline-secondary btn-sm">生成新链接</a>
+        </div>
+
+        {% else %}
+        <!-- 搜索 + 生成 -->
+        <p class="text-muted mb-3" style="font-size:14px;">可通过搜索选择员工（自动预填历史记录），也可直接输入员工编号或留空生成空白表单。</p>
+
+        <!-- 搜索员工（可选） -->
+        <div class="mb-3 d-flex gap-2 align-items-center">
+            <input type="text" id="search-input" class="form-control" placeholder="搜索员工编号 / 姓名（可选）" style="max-width:260px;">
+            <button class="btn btn-outline-secondary btn-sm" onclick="searchEmployee()">搜索</button>
+        </div>
+
+        <div id="search-results" style="display:none;">
+            <div id="result-list" class="emp-result mb-3"></div>
+        </div>
+        <div id="no-result" class="text-muted mb-2" style="font-size:13px; display:none;">未找到匹配员工。</div>
+
+        <!-- 直接生成表单 -->
+        <form method="POST" id="generate-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label style="font-size:13px; font-weight:500;">员工编号（选填，留空则生成空白表单）</label>
+                <input type="text" name="employee_id" id="selected-employee-id" class="form-control mt-1"
+                       placeholder="输入员工编号" style="max-width:260px;">
+                <div class="form-text">如已通过搜索选择员工，此处会自动填入。</div>
+            </div>
+            <button type="submit" class="btn btn-primary">生成链接</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function searchEmployee() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    const res = await fetch(`/employees/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    const resultDiv = document.getElementById('search-results');
+    const noResult = document.getElementById('no-result');
+    const list = document.getElementById('result-list');
+
+    if (data.length === 0) {
+        resultDiv.style.display = 'none';
+        noResult.style.display = '';
+        return;
+    }
+    noResult.style.display = 'none';
+    list.innerHTML = '';
+    data.forEach(emp => {
+        const row = document.createElement('div');
+        row.className = 'emp-row';
+        row.innerHTML = `<span class="emp-id">${emp.employee_id}</span>
+            <span class="emp-name">${emp.name}</span>
+            <span class="emp-email">${emp.email}</span>
+            <button class="btn btn-sm btn-primary py-0 px-2" onclick="selectEmployee('${emp.employee_id}','${emp.name}','${emp.email}')">选择</button>`;
+        list.appendChild(row);
+    });
+    resultDiv.style.display = '';
+}
+
+function selectEmployee(id, name, email) {
+    document.getElementById('selected-employee-id').value = id;
+    document.getElementById('search-results').style.display = 'none';
+    document.getElementById('no-result').style.display = 'none';
+    document.getElementById('search-input').value = name + ' (' + id + ')';
+}
+
+document.getElementById('search-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); searchEmployee(); }
+});
+
+function copyUrl() {
+    const input = document.getElementById('form-url-input');
+    const tip = document.getElementById('copy-tip');
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value).then(() => {
+            tip.style.display = ''; setTimeout(() => tip.style.display = 'none', 2000);
+        }).catch(() => fallbackCopy(input, tip));
+    } else {
+        fallbackCopy(input, tip);
+    }
+}
+function fallbackCopy(input, tip) {
+    input.select(); input.setSelectionRange(0, 99999);
+    try { document.execCommand('copy'); tip.style.display = ''; setTimeout(() => tip.style.display = 'none', 2000); }
+    catch(e) { alert('请手动复制链接'); }
+}
+</script>
+{% endblock %}

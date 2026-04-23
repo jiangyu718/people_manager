@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block title %}数据备份{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-label { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .form-control, .form-select { font-size: 13px; }
+    .hint { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .status-pill {
+        display: inline-block; padding: 2px 8px; border-radius: 999px;
+        font-size: 12px; font-weight: 600;
+    }
+    .status-ok { background: #ecfdf5; color: #047857; }
+    .status-fail { background: #fef2f2; color: #b91c1c; }
+    .status-partial { background: #fffbeb; color: #92400e; }
+    .status-none { background: #f3f4f6; color: #6b7280; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>💾 数据备份</h5>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm p-4 mb-3" style="max-width:640px;">
+        <div style="font-size:13px; color:#374151; line-height:1.7;">
+            每次备份将生成两份附件发送到指定邮箱：
+            <ul class="mb-0" style="padding-left:20px;">
+                <li><strong>异地情况记录.xlsx</strong> — 全部已审核人员数据</li>
+                <li><strong>personnel.db</strong> — 完整数据库（含所有模块数据）</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3 shadow-sm p-4" style="max-width:640px;">
+        <form method="POST" action="{{ url_for('email.backup') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <div class="mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="enabled" value="1"
+                           id="enabled" {% if cfg and cfg.enabled %}checked{% endif %}>
+                    <label class="form-check-label" for="enabled">启用定期备份</label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">备份频率</label>
+                <select name="schedule_type" id="schedule_type" class="form-select" onchange="toggleFreq()">
+                    <option value="daily"   {% if not cfg or cfg.schedule_type == 'daily' %}selected{% endif %}>每天</option>
+                    <option value="weekly"  {% if cfg and cfg.schedule_type == 'weekly' %}selected{% endif %}>每周</option>
+                    <option value="monthly" {% if cfg and cfg.schedule_type == 'monthly' %}selected{% endif %}>每月</option>
+                </select>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-sm-6" id="dow-wrap" style="display:none;">
+                    <label class="form-label">星期</label>
+                    <select name="day_of_week" class="form-select">
+                        {% set dow = cfg.day_of_week if cfg and cfg.day_of_week is not none else 0 %}
+                        <option value="0" {% if dow == 0 %}selected{% endif %}>周一</option>
+                        <option value="1" {% if dow == 1 %}selected{% endif %}>周二</option>
+                        <option value="2" {% if dow == 2 %}selected{% endif %}>周三</option>
+                        <option value="3" {% if dow == 3 %}selected{% endif %}>周四</option>
+                        <option value="4" {% if dow == 4 %}selected{% endif %}>周五</option>
+                        <option value="5" {% if dow == 5 %}selected{% endif %}>周六</option>
+                        <option value="6" {% if dow == 6 %}selected{% endif %}>周日</option>
+                    </select>
+                </div>
+                <div class="col-sm-6" id="dom-wrap" style="display:none;">
+                    <label class="form-label">每月日期</label>
+                    <input type="number" min="1" max="31" name="day_of_month" class="form-control"
+                           value="{{ cfg.day_of_month if cfg and cfg.day_of_month else 1 }}">
+                    <div class="hint">1–31；若该月无此日期则跳过。</div>
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">执行时间</label>
+                    <input type="time" name="run_time" class="form-control"
+                           value="{{ cfg.run_time if cfg else '02:00' }}">
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">收件人邮箱</label>
+                <textarea name="recipients" class="form-control" rows="2"
+                          placeholder="多个邮箱用逗号或换行分隔">{{ cfg.recipients if cfg else '' }}</textarea>
+                <div class="hint">支持中英文逗号 / 分号 / 换行分隔多个邮箱。</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">邮件主题（选填）</label>
+                <input type="text" name="subject" class="form-control"
+                       value="{{ cfg.subject if cfg and cfg.subject else '' }}"
+                       placeholder="留空将使用默认：人员管理系统数据备份 YYYYMMDD_HHMMSS">
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">保存配置</button>
+                {% if cfg %}
+                <button type="button" class="btn btn-outline-secondary"
+                        onclick="document.getElementById('run-now-form').submit();">
+                    立即备份一次
+                </button>
+                {% endif %}
+            </div>
+        </form>
+
+        {% if cfg %}
+        <form id="run-now-form" method="POST" action="{{ url_for('email.backup_run_now') }}" style="display:none;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        </form>
+
+        <hr class="my-4">
+        <div style="font-size:13px; color:#374151;">
+            <div class="mb-1">
+                <strong>上次执行：</strong>
+                {% if cfg.last_run_at %}
+                    {{ cfg.last_run_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {% if cfg.last_status == 'ok' %}
+                        <span class="status-pill status-ok">成功</span>
+                    {% elif cfg.last_status == 'fail' %}
+                        <span class="status-pill status-fail">失败</span>
+                    {% elif cfg.last_status == 'partial' %}
+                        <span class="status-pill status-partial">部分成功</span>
+                    {% endif %}
+                {% else %}
+                    <span class="status-pill status-none">未执行</span>
+                {% endif %}
+            </div>
+            {% if cfg.last_error %}
+                <div class="mt-1" style="font-size:12px; color:#b91c1c; word-break:break-all;">
+                    {{ cfg.last_error }}
+                </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleFreq() {
+    const t = document.getElementById('schedule_type').value;
+    document.getElementById('dow-wrap').style.display = (t === 'weekly') ? '' : 'none';
+    document.getElementById('dom-wrap').style.display = (t === 'monthly') ? '' : 'none';
+}
+toggleFreq();
+</script>
+{% endblock %}

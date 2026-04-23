@@ -1,0 +1,417 @@
+{# 人员异地记录表单 — 添加/编辑 共享 JS。
+   可选 context:
+   - prefill_dates: dict，各日期字段 YYYY-MM-DD 字符串（编辑/回填时使用）
+   - prefill_has_property: '是' / '否' / ''
+#}
+<script>
+    const cityData = {{ china_cities | tojson }};
+
+    function bindProvinceChange(provinceId, cityId) {
+        const provinceSelect = document.getElementById(provinceId);
+        const citySelect = document.getElementById(cityId);
+        provinceSelect.addEventListener('change', function() {
+            citySelect.innerHTML = '<option value="">请选择市</option>';
+            (cityData[this.value] || []).forEach(city => {
+                const opt = document.createElement('option');
+                opt.value = city; opt.textContent = city;
+                citySelect.appendChild(opt);
+            });
+        });
+    }
+
+    function clearLoc(loc) {
+        const pSel = document.getElementById(`${loc}_province`);
+        const cSel = document.getElementById(`${loc}_city`);
+        if (pSel) pSel.value = '';
+        if (cSel) cSel.innerHTML = '<option value="">请选择市</option>';
+    }
+    ['work', 'household', 'spouse', 'children'].forEach(p => {
+        bindProvinceChange(p + '_province', p + '_city');
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        ['work', 'household', 'spouse', 'children'].forEach(p => {
+            const provinceSelect = document.getElementById(p + '_province');
+            const citySelect = document.getElementById(p + '_city');
+            const province = provinceSelect.value;
+            if (province && cityData[province]) {
+                const current = citySelect.value;
+                citySelect.innerHTML = '<option value="">请选择市</option>';
+                cityData[province].forEach(city => {
+                    const opt = document.createElement('option');
+                    opt.value = city; opt.textContent = city;
+                    if (city === current) opt.selected = true;
+                    citySelect.appendChild(opt);
+                });
+            }
+        });
+    });
+
+    function togglePropertyUpload(show) {
+        document.getElementById('property-section').style.display = show ? '' : 'none';
+        if (!show) {
+            document.getElementById('property_delivery_date').value = '';
+            document.getElementById('property_date_display').value = '';
+        }
+    }
+
+    function createCalendar(wrapperId, hiddenId, displayId) {
+        const wrapper = document.getElementById(wrapperId);
+        const hidden = document.getElementById(hiddenId);
+        const display = document.getElementById(displayId);
+        const TD = new Date();
+        let selDate = null, viewY = TD.getFullYear(), viewM = TD.getMonth();
+        let tempDate = null, view = 'day', yrStart = viewY - 7;
+
+        const popup = document.createElement('div');
+        popup.className = 'calendar-popup';
+        popup.innerHTML = `
+            <div class="cal-header">
+                <div class="cal-nav-group">
+                    <button type="button" class="cal-nav-btn" data-a="pb">«</button>
+                    <button type="button" class="cal-nav-btn" data-a="ps">‹</button>
+                </div>
+                <span class="cal-title"></span>
+                <div class="cal-nav-group">
+                    <button type="button" class="cal-nav-btn" data-a="ns">›</button>
+                    <button type="button" class="cal-nav-btn" data-a="nb">»</button>
+                </div>
+            </div>
+            <div class="cal-weekdays">
+                <div class="cal-weekday">日</div><div class="cal-weekday">一</div>
+                <div class="cal-weekday">二</div><div class="cal-weekday">三</div>
+                <div class="cal-weekday">四</div><div class="cal-weekday">五</div>
+                <div class="cal-weekday">六</div>
+            </div>
+            <div class="cal-days"></div>
+            <div class="cal-footer">
+                <span class="cal-date-display">--</span>
+                <button type="button" class="cal-btn clr">清空</button>
+                <button type="button" class="cal-btn now">今天</button>
+                <button type="button" class="cal-btn confirm">确定</button>
+            </div>`;
+        wrapper.appendChild(popup);
+        popup.addEventListener('click', e => e.stopPropagation());
+
+        const titleEl = popup.querySelector('.cal-title');
+        const wkEl = popup.querySelector('.cal-weekdays');
+        const gridEl = popup.querySelector('.cal-days');
+        const dateLbl = popup.querySelector('.cal-date-display');
+        const psBtn = popup.querySelector('[data-a="ps"]');
+        const nsBtn = popup.querySelector('[data-a="ns"]');
+
+        const pad = n => String(n).padStart(2, '0');
+        const fmt = d => d ? d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()) : '';
+
+        function render() {
+            dateLbl.textContent = tempDate ? fmt(tempDate) : '--';
+            if (view === 'day') renderDay();
+            else if (view === 'month') renderMonth();
+            else renderYear();
+        }
+        function renderDay() {
+            wkEl.style.display=''; psBtn.style.visibility=''; nsBtn.style.visibility='';
+            titleEl.innerHTML = '<span class="cal-title-btn">'+viewY+'年</span>&nbsp;<span class="cal-title-btn">'+(viewM+1)+'月</span>';
+            titleEl.querySelectorAll('.cal-title-btn')[0].addEventListener('click', e=>{e.stopPropagation(); yrStart=viewY-7; view='year'; render();});
+            titleEl.querySelectorAll('.cal-title-btn')[1].addEventListener('click', e=>{e.stopPropagation(); view='month'; render();});
+            gridEl.style.gridTemplateColumns='repeat(7,1fr)';
+            const firstDay = new Date(viewY, viewM, 1).getDay();
+            const dim = new Date(viewY, viewM+1, 0).getDate();
+            const prevDim = new Date(viewY, viewM, 0).getDate();
+            gridEl.innerHTML = '';
+            for (let i=firstDay-1; i>=0; i--) {
+                const d=document.createElement('div'); d.className='cal-day other-month';
+                d.textContent=prevDim-i; gridEl.appendChild(d);
+            }
+            for (let n=1; n<=dim; n++) {
+                const d=document.createElement('div'); d.className='cal-day'; d.textContent=n;
+                if (TD.getFullYear()===viewY && TD.getMonth()===viewM && TD.getDate()===n) d.classList.add('today');
+                if (tempDate && tempDate.getFullYear()===viewY && tempDate.getMonth()===viewM && tempDate.getDate()===n) d.classList.add('selected');
+                d.addEventListener('click', ()=>{ tempDate=new Date(viewY,viewM,n); render(); });
+                gridEl.appendChild(d);
+            }
+            const total = firstDay + dim;
+            for (let n=1; n<=(total%7===0?0:7-total%7); n++) {
+                const d=document.createElement('div'); d.className='cal-day other-month';
+                d.textContent=n; gridEl.appendChild(d);
+            }
+        }
+        function renderMonth() {
+            wkEl.style.display='none'; psBtn.style.visibility='hidden'; nsBtn.style.visibility='hidden';
+            titleEl.textContent=viewY+'年'; titleEl.style.cursor='pointer';
+            gridEl.style.gridTemplateColumns='repeat(4,1fr)'; gridEl.innerHTML='';
+            ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'].forEach((nm, i)=>{
+                const d=document.createElement('div'); d.className='cal-day wide'; d.textContent=nm;
+                if (TD.getFullYear()===viewY && TD.getMonth()===i) d.classList.add('today');
+                if (tempDate && tempDate.getFullYear()===viewY && tempDate.getMonth()===i) d.classList.add('selected');
+                d.addEventListener('click', ()=>{ viewM=i; view='day'; render(); });
+                gridEl.appendChild(d);
+            });
+        }
+        function renderYear() {
+            wkEl.style.display='none'; psBtn.style.visibility='hidden'; nsBtn.style.visibility='hidden';
+            titleEl.textContent=yrStart+'年 - '+(yrStart+19)+'年';
+            gridEl.style.gridTemplateColumns='repeat(4,1fr)'; gridEl.innerHTML='';
+            for (let y=yrStart; y<yrStart+20; y++) {
+                const d=document.createElement('div'); d.className='cal-day wide'; d.textContent=y;
+                if (TD.getFullYear()===y) d.classList.add('today');
+                if (tempDate && tempDate.getFullYear()===y) d.classList.add('selected');
+                d.addEventListener('click', ()=>{ viewY=y; view='month'; render(); });
+                gridEl.appendChild(d);
+            }
+        }
+        popup.querySelector('[data-a="pb"]').addEventListener('click', ()=>{ if(view==='day'||view==='month') viewY--; else yrStart-=20; render(); });
+        popup.querySelector('[data-a="nb"]').addEventListener('click', ()=>{ if(view==='day'||view==='month') viewY++; else yrStart+=20; render(); });
+        psBtn.addEventListener('click', ()=>{ if(--viewM<0){viewM=11; viewY--;} render(); });
+        nsBtn.addEventListener('click', ()=>{ if(++viewM>11){viewM=0; viewY++;} render(); });
+        titleEl.addEventListener('click', ()=>{ if(view==='month'){ yrStart=viewY-7; view='year'; render(); } });
+        const clearX = document.createElement('button');
+        clearX.type = 'button'; clearX.className = 'cal-clear-x'; clearX.innerHTML = '&times;'; clearX.title = '清空';
+        wrapper.appendChild(clearX);
+        function syncClearX() { clearX.classList.toggle('visible', !!display.value); }
+
+        popup.querySelector('.clr').addEventListener('click', ()=>{ tempDate=selDate=null; hidden.value=''; display.value=''; syncClearX(); render(); });
+        popup.querySelector('.now').addEventListener('click', ()=>{
+            tempDate=new Date(TD.getFullYear(), TD.getMonth(), TD.getDate());
+            viewY=tempDate.getFullYear(); viewM=tempDate.getMonth(); view='day'; render();
+        });
+        popup.querySelector('.confirm').addEventListener('click', ()=>{
+            if (tempDate) { selDate=tempDate; hidden.value=fmt(selDate); display.value=fmt(selDate); syncClearX(); }
+            popup.classList.remove('open');
+        });
+        clearX.addEventListener('click', e=>{ e.stopPropagation(); tempDate=selDate=null; hidden.value=''; display.value=''; syncClearX(); render(); });
+        display.addEventListener('click', ()=>{
+            if (selDate) { tempDate=new Date(selDate); viewY=tempDate.getFullYear(); viewM=tempDate.getMonth(); }
+            else { tempDate=null; viewY=TD.getFullYear(); viewM=TD.getMonth(); }
+            view='day'; render(); popup.classList.toggle('open');
+        });
+        document.addEventListener('click', e=>{ if(!wrapper.contains(e.target)) popup.classList.remove('open'); });
+        render();
+        return {
+            setDate(val) {
+                if (!val) return;
+                const parts = val.split('-');
+                selDate = tempDate = new Date(+parts[0], +parts[1]-1, +parts[2]);
+                viewY = selDate.getFullYear(); viewM = selDate.getMonth();
+                hidden.value = val; display.value = val; syncClearX(); render();
+            }
+        };
+    }
+
+    // 克隆表单：移除不需要复制的附件（将 ID 加入 clone_exclude_ids 隐藏字段）
+    window.removeCloneAtt = function(attId, btn) {
+        const row = btn.closest('.clone-att-row');
+        const form = document.getElementById('personnel-form');
+        if (form) {
+            const hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'clone_exclude_ids';
+            hidden.value = attId;
+            form.appendChild(hidden);
+        }
+        if (row) row.remove();
+    };
+
+    // 多文件累加上传：每次选择追加而非替换，支持单个移除
+    function wireFileAccumulator(inputId, statusId) {
+        const inp = document.getElementById(inputId);
+        const status = document.getElementById(statusId);
+        if (!inp || !status) return;
+        const store = new DataTransfer();
+
+        function syncInput() {
+            const dt = new DataTransfer();
+            for (let i = 0; i < store.items.length; i++) dt.items.add(store.files[i]);
+            inp.files = dt.files;
+        }
+        function render() {
+            if (store.items.length === 0) { status.innerHTML = ''; return; }
+            const wrap = document.createElement('div');
+            const header = document.createElement('div');
+            header.className = 'text-success fw-bold';
+            header.textContent = `✓ 待上传 ${store.items.length} 个文件：`;
+            wrap.appendChild(header);
+            for (let i = 0; i < store.items.length; i++) {
+                const f = store.files[i];
+                const row = document.createElement('div');
+                row.className = 'd-flex align-items-center gap-2';
+                row.innerHTML = `<span>📎</span>
+                    <span style="flex:1; word-break:break-all;">${f.name} <span class="text-muted">(${(f.size/1024).toFixed(1)} KB)</span></span>`;
+                const rm = document.createElement('button');
+                rm.type = 'button';
+                rm.className = 'btn btn-sm btn-outline-danger py-0 px-2';
+                rm.textContent = '移除';
+                rm.addEventListener('click', () => {
+                    store.items.remove(i);
+                    syncInput();
+                    render();
+                });
+                row.appendChild(rm);
+                wrap.appendChild(row);
+            }
+            status.innerHTML = '';
+            status.appendChild(wrap);
+        }
+        inp.addEventListener('change', function(e) {
+            const picked = Array.from(e.target.files || []);
+            picked.forEach(f => {
+                const dup = Array.from(store.files).some(s => s.name === f.name && s.size === f.size && s.lastModified === f.lastModified);
+                if (!dup) store.items.add(f);
+            });
+            syncInput();
+            render();
+        });
+    }
+    wireFileAccumulator('household_file_input', 'household_file_status');
+    wireFileAccumulator('property_file_input', 'property_file_status');
+
+    // 删除已上传附件（异步，不触发外层表单提交）
+    window.deleteAttachment = async function(attId, btn) {
+        if (!confirm('确定删除该附件？删除后不可恢复。')) return;
+        btn.disabled = true;
+        try {
+            const resp = await fetch('/attachment/' + attId + '/delete', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token() }}',
+                    'X-Requested-With': 'fetch',
+                    'Accept': 'application/json',
+                },
+            });
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const row = btn.closest('.existing-att-row, .email-att-row');
+            const list = btn.closest('.existing-att-list, .email-att-list');
+            if (row) row.remove();
+            if (list && list.querySelectorAll('.existing-att-row, .email-att-row').length === 0) list.remove();
+        } catch (e) {
+            alert('删除失败：' + e.message);
+            btn.disabled = false;
+        }
+    };
+
+    const cals = {
+        property:  createCalendar('property-cal-wrap',     'property_delivery_date',    'property_date_display'),
+        remoteStart: createCalendar('remote-cal-wrap',     'remote_start_date',         'remote_date_display'),
+        remoteEnd: createCalendar('remote-end-cal-wrap',   'remote_end_date',           'remote_end_date_display'),
+        workLoc:   createCalendar('work-loc-date-wrap',    'work_location_date',        'work_location_date_display'),
+        householdLoc: createCalendar('household-loc-date-wrap', 'household_location_date', 'household_location_date_display'),
+        spouseLoc: createCalendar('spouse-loc-date-wrap',  'spouse_location_date',      'spouse_location_date_display'),
+        createdAt: createCalendar('created-at-cal-wrap',   'created_at_edit',           'created_at_edit_display'),
+        rankDate:  createCalendar('rank-date-cal-wrap',    'rank_date',                 'rank_date_display'),
+    };
+
+    (function applyPrefill() {
+        const pre = {{ (prefill_dates or {}) | tojson }};
+        if (pre.remote_start) cals.remoteStart.setDate(pre.remote_start);
+        if (pre.remote_end)   cals.remoteEnd.setDate(pre.remote_end);
+        if (pre.work_loc)     cals.workLoc.setDate(pre.work_loc);
+        if (pre.household_loc) cals.householdLoc.setDate(pre.household_loc);
+        if (pre.spouse_loc)   cals.spouseLoc.setDate(pre.spouse_loc);
+        if (pre.created_at)   cals.createdAt.setDate(pre.created_at);
+        if (pre.rank_date)    cals.rankDate.setDate(pre.rank_date);
+
+        const hp = {{ (prefill_has_property or '') | tojson }};
+        if (hp) {
+            document.querySelectorAll('input[name="has_property"]').forEach(r => {
+                r.checked = (r.value === hp);
+            });
+            if (hp === '是') {
+                togglePropertyUpload(true);
+                if (pre.property) cals.property.setDate(pre.property);
+            }
+        }
+    })();
+
+    // 提交前必填校验：收集所有未填项，滚动到第一个并全部闪红框
+    (function wireRequiredValidation() {
+        const isEdit  = {{ ((personnel is defined) and (personnel is not none)) | tojson }};
+        const isClone = {{ (clone_from_id is defined and clone_from_id) | tojson }};
+        const origHouseholdLoc = (() => {
+            const hp = document.getElementById('household_province')?.value || '';
+            const hc = document.getElementById('household_city')?.value || '';
+            return hp + '|' + hc;
+        })();
+        function currentHouseholdLoc() {
+            const hp = document.getElementById('household_province')?.value || '';
+            const hc = document.getElementById('household_city')?.value || '';
+            return hp + '|' + hc;
+        }
+        function hasExistingAtt(category) {
+            return !!document.querySelector(
+                `.existing-att-list[data-list="${category}"] .existing-att-row`);
+        }
+
+        const form = document.getElementById('personnel-form');
+        if (!form) return;
+        form.addEventListener('submit', function(e) {
+            const failures = [];
+            const seen = new Set();
+            function addFail(el) {
+                if (!el) return;
+                const section = el.closest?.('.form-section') || el;
+                if (!seen.has(section)) { seen.add(section); failures.push(section); }
+            }
+
+            // 人员类型
+            const ptEl = document.getElementById('personnel_type');
+            if (!ptEl?.value) addFail(ptEl);
+            // 员工编号
+            const eidEl = document.getElementById('employee_id');
+            if (!eidEl?.value?.trim()) addFail(eidEl);
+            // 姓名
+            const nameEl = document.getElementById('name');
+            if (!nameEl?.value?.trim()) addFail(nameEl);
+            // 职级
+            const rankEl = document.getElementById('rank');
+            if (!rankEl?.value?.trim()) addFail(rankEl);
+            // 工作所在地（省市同一 section，合并为一个失败项）
+            const wpEl = document.getElementById('work_province');
+            const wcEl = document.getElementById('work_city');
+            if (!wpEl?.value || !wcEl?.value) addFail(wpEl);
+            // 户口所在地
+            const hpEl = document.getElementById('household_province');
+            const hcEl = document.getElementById('household_city');
+            if (!hpEl?.value || !hcEl?.value) addFail(hpEl);
+            // 是否在工作地购置房产
+            const hasPropChecked = document.querySelector('input[name="has_property"]:checked');
+            if (!hasPropChecked) addFail(document.querySelector('input[name="has_property"]'));
+            // 户口本材料（克隆时源记录的附件会被自动复制，跳过）
+            if (!isClone) {
+                const hInput = document.getElementById('household_file_input');
+                const hasNewHousehold = hInput && hInput.files && hInput.files.length > 0;
+                const householdChanged = currentHouseholdLoc() !== origHouseholdLoc;
+                if (!isEdit) {
+                    if (!hasNewHousehold) addFail(hInput);
+                } else if (householdChanged) {
+                    if (!hasNewHousehold) addFail(hInput);
+                } else if (!hasExistingAtt('household') && !hasNewHousehold) {
+                    addFail(hInput);
+                }
+            }
+            // 购置房产=是时的条件必填项
+            const hasProp = hasPropChecked?.value;
+            if (hasProp === '是') {
+                const propDate = document.getElementById('property_delivery_date')?.value || '';
+                if (!propDate) addFail(document.getElementById('property_date_display'));
+                const allSoldEl = document.querySelector('[name="property_all_sold"]');
+                if (!allSoldEl?.value) addFail(allSoldEl);
+                if (!isClone) {
+                    const pInput = document.getElementById('property_file_input');
+                    const hasNewProp = pInput && pInput.files && pInput.files.length > 0;
+                    if (!hasExistingAtt('property') && !hasNewProp) addFail(pInput);
+                }
+            }
+
+            if (failures.length > 0) {
+                e.preventDefault();
+                failures[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                failures.forEach(section => {
+                    section.classList.remove('field-flash');
+                    void section.offsetWidth;
+                    section.classList.add('field-flash');
+                    setTimeout(() => section.classList.remove('field-flash'), 1500);
+                });
+            }
+        });
+    })();
+</script>

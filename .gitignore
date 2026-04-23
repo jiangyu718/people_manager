@@ -1,0 +1,10 @@
+*/__pycache__
+/__pycache__
+__pycache__/
+*.py[cod]
+*$py.class
+blueprints/__pycache__/
+services/__pycache__/
+.vscode
+.claude
+personnel.db

@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+{% block title %}邮件发送{% endblock %}
+
+{% block extra_css %}
+<style>
+    .recipient-card {
+        background: #fff; border-radius: 8px; padding: 14px;
+        max-height: 460px; overflow-y: auto;
+        border: 1px solid #e5e7eb;
+    }
+    .emp-row {
+        display: flex; align-items: center; gap: 10px;
+        padding: 6px 4px; border-bottom: 1px solid #f3f4f6; font-size: 13px;
+    }
+    .emp-row:last-child { border-bottom: none; }
+    .emp-id { color: #6b7280; font-size: 12px; min-width: 80px; }
+    .emp-name { font-weight: 500; min-width: 90px; }
+    .emp-email { color: #4b5563; font-size: 12px; flex: 1; }
+    .emp-email.missing { color: #b91c1c; }
+    .toolbar-btn {
+        background: #f3f4f6; border: 1px solid #d1d5db;
+        border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+    .toolbar-btn:hover { background: #e5e7eb; }
+    .warn-box {
+        background: #fef3c7; border: 1px solid #f59e0b; color: #92400e;
+        padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px;
+    }
+    .filter-box {
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+        padding: 10px 12px; margin-bottom: 10px;
+    }
+    .filter-box .form-label { font-size: 12px; margin-bottom: 2px; font-weight: 600; }
+    .filter-box .form-control, .filter-box .form-select { font-size: 12px; padding: 4px 8px; }
+    .emp-row.hidden { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>📤 邮件发送</h5>
+    <a href="{{ url_for('email.logs') }}" class="btn btn-outline-secondary btn-sm">查看发送记录</a>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if missing_email %}
+    <div class="warn-box">
+        ⚠️ 共 <strong>{{ missing_email|length }}</strong> 位员工未配置邮箱，无法接收邮件，请先在
+        <a href="{{ url_for('employee.list_view') }}" class="text-decoration-underline">员工管理</a> 中补全：
+        {% for e in missing_email %}<span class="mx-1">{{ e.name }}({{ e.employee_id }})</span>{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('email.send') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="row g-3">
+            <div class="col-lg-7">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <strong style="font-size:14px;">选择收件人</strong>
+                    <span class="text-muted" id="sel-count" style="font-size:12px;"></span>
+                    <span class="text-muted" id="visible-count" style="font-size:12px;"></span>
+                    <div class="ms-auto d-flex gap-1">
+                        <button type="button" class="toolbar-btn" onclick="selectAll(true)">全选</button>
+                        <button type="button" class="toolbar-btn" onclick="selectAll(false)">全部清除</button>
+                        <button type="button" class="toolbar-btn" onclick="selectWithEmail()">仅选有邮箱</button>
+                    </div>
+                </div>
+
+                <div class="filter-box">
+                    <div class="row g-2">
+                        <div class="col-md-12">
+                            <label class="form-label">搜索（姓名 / 工号）</label>
+                            <input type="text" id="f-keyword" class="form-control" placeholder="输入姓名或工号关键字">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">职级（最低）</label>
+                            <input type="number" id="f-rank-min" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">职级（最高）</label>
+                            <input type="number" id="f-rank-max" class="form-control">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">异地状态</label>
+                            <select id="f-remote" class="form-select">
+                                <option value="any">不限</option>
+                                <option value="yes">异地</option>
+                                <option value="no">非异地</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="resetFilters()">重置</button>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">异地开始时间 从</label>
+                            <input type="date" id="f-remote-from" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">至</label>
+                            <input type="date" id="f-remote-to" class="form-control">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recipient-card">
+                    {% if employees %}
+                    {% set _ei = emp_info|default({}) %}
+                    {% for e in employees %}
+                    {% set info = _ei.get(e.employee_id, {}) if _ei else {} %}
+                    <div class="emp-row"
+                         data-name="{{ e.name|lower }}"
+                         data-eid="{{ e.employee_id|lower }}"
+                         data-rank="{{ info.rank or '' }}"
+                         data-remote="{{ info.remote or '' }}"
+                         data-remote-start="{{ info.remote_start or '' }}">
+                        <input type="checkbox" class="emp-cb" name="employee_ids" value="{{ e.employee_id }}" {% if not e.email %}disabled{% endif %}>
+                        <span class="emp-id">{{ e.employee_id }}</span>
+                        <span class="emp-name">{{ e.name }}</span>
+                        <span class="emp-email {% if not e.email %}missing{% endif %}">{{ e.email or '（未配置邮箱）' }}</span>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-muted text-center py-4">暂无员工，请先在 <a href="{{ url_for('employee.list_view') }}">员工管理</a> 中添加</div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="bg-white rounded-3 p-3" style="border:1px solid #e5e7eb;">
+                    <label class="form-label fw-bold">邮件模板</label>
+                    <select name="template_id" id="tpl-select" class="form-select" required>
+                        <option value="">请选择...</option>
+                        {% for t in templates %}
+                        <option value="{{ t.id }}" data-subject="{{ t.subject }}" data-body="{{ t.body }}">{{ t.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if not templates %}
+                    <div class="text-muted mt-2" style="font-size:12px;">尚无模板，请先 <a href="{{ url_for('email.template_new') }}">创建模板</a></div>
+                    {% endif %}
+
+                    <div id="tpl-preview" class="mt-3" style="display:none;">
+                        <label class="form-label fw-bold" style="font-size:13px;">预览</label>
+                        <div style="font-size:12px;"><strong>主题：</strong><span id="pv-subject"></span></div>
+                        <div style="font-size:12px; max-height:220px; overflow:auto; border:1px solid #eee; border-radius:6px; padding:8px; margin-top:6px;" id="pv-body"></div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 mt-3" id="send-btn" disabled
+                            onclick="return confirm('确认发送？');">
+                        发送邮件
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const rows = Array.from(document.querySelectorAll('.emp-row'));
+const cbs = Array.from(document.querySelectorAll('.emp-cb'));
+const selCount = document.getElementById('sel-count');
+const visCount = document.getElementById('visible-count');
+const tplSel = document.getElementById('tpl-select');
+const sendBtn = document.getElementById('send-btn');
+const preview = document.getElementById('tpl-preview');
+
+function visibleCbs() {
+    return cbs.filter(c => !c.closest('.emp-row').classList.contains('hidden'));
+}
+function updateCount() {
+    const n = cbs.filter(c => c.checked).length;
+    selCount.textContent = n > 0 ? `已选 ${n} 位` : '';
+    const vis = rows.filter(r => !r.classList.contains('hidden')).length;
+    visCount.textContent = `（可见 ${vis} / ${rows.length}）`;
+    sendBtn.disabled = !(n > 0 && tplSel.value);
+}
+cbs.forEach(c => c.addEventListener('change', updateCount));
+tplSel.addEventListener('change', function() {
+    const opt = this.options[this.selectedIndex];
+    if (this.value) {
+        document.getElementById('pv-subject').textContent = opt.dataset.subject || '';
+        document.getElementById('pv-body').innerHTML = opt.dataset.body || '';
+        preview.style.display = '';
+    } else {
+        preview.style.display = 'none';
+    }
+    updateCount();
+});
+
+function selectAll(on) {
+    visibleCbs().forEach(c => { if (!c.disabled) c.checked = on; });
+    updateCount();
+}
+function selectWithEmail() {
+    visibleCbs().forEach(c => { c.checked = !c.disabled; });
+    updateCount();
+}
+
+// ── 筛选逻辑 ──
+const fKw = document.getElementById('f-keyword');
+const fRmin = document.getElementById('f-rank-min');
+const fRmax = document.getElementById('f-rank-max');
+const fRemote = document.getElementById('f-remote');
+const fFrom = document.getElementById('f-remote-from');
+const fTo = document.getElementById('f-remote-to');
+
+function applyFilter() {
+    const kw = (fKw.value || '').trim().toLowerCase();
+    const rmin = fRmin.value ? parseInt(fRmin.value) : null;
+    const rmax = fRmax.value ? parseInt(fRmax.value) : null;
+    const remote = fRemote.value;
+    const from = fFrom.value;
+    const to = fTo.value;
+    rows.forEach(row => {
+        let ok = true;
+        if (kw) {
+            const hay = (row.dataset.name + ' ' + row.dataset.eid);
+            if (!hay.includes(kw)) ok = false;
+        }
+        if (ok && (rmin !== null || rmax !== null)) {
+            const r = row.dataset.rank ? parseInt(row.dataset.rank) : null;
+            if (r === null) ok = false;
+            else {
+                if (rmin !== null && r < rmin) ok = false;
+                if (rmax !== null && r > rmax) ok = false;
+            }
+        }
+        if (ok && remote !== 'any') {
+            if (row.dataset.remote !== remote) ok = false;
+        }
+        if (ok && (from || to)) {
+            const rs = row.dataset.remoteStart;
+            if (!rs) ok = false;
+            else {
+                if (from && rs < from) ok = false;
+                if (to && rs > to) ok = false;
+            }
+        }
+        row.classList.toggle('hidden', !ok);
+    });
+    updateCount();
+}
+function resetFilters() {
+    fKw.value = ''; fRmin.value = ''; fRmax.value = '';
+    fRemote.value = 'any'; fFrom.value = ''; fTo.value = '';
+    applyFilter();
+}
+[fKw, fRmin, fRmax, fRemote, fFrom, fTo].forEach(el => {
+    el.addEventListener('input', applyFilter);
+    el.addEventListener('change', applyFilter);
+});
+updateCount();
+</script>
+{% endblock %}

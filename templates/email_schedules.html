@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}定时发送{% endblock %}
+
+{% block extra_css %}
+<style>
+    th, td { font-size: 12px; }
+    .status-on  { background:#d1fae5; color:#065f46; padding:2px 8px; border-radius:12px; font-size:11px; }
+    .status-off { background:#f3f4f6; color:#6b7280; padding:2px 8px; border-radius:12px; font-size:11px; }
+    .type-badge { background:#e0f2fe; color:#075985; padding:2px 8px; border-radius:12px; font-size:11px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>⏰ 定时发送</h5>
+    <a href="{{ url_for('email.schedule_new') }}" class="btn btn-success btn-sm">+ 新建任务</a>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    {% if schedules %}
+    <div class="table-responsive bg-white rounded-3 shadow-sm">
+        <table class="table table-bordered table-hover table-sm align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>任务名称</th>
+                    <th>邮件模板</th>
+                    <th>周期</th>
+                    <th>执行时间</th>
+                    <th>收件人</th>
+                    <th>上次执行</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in schedules %}
+                <tr>
+                    <td>{{ s.name }}</td>
+                    <td>{{ templates.get(s.template_id, '-') }}</td>
+                    <td>
+                        {% if s.schedule_type == 'daily' %}
+                            <span class="type-badge">每天</span>
+                        {% elif s.schedule_type == 'monthly' %}
+                            <span class="type-badge">每月 {{ s.day_of_month }} 号</span>
+                        {% elif s.schedule_type == 'once' %}
+                            <span class="type-badge">单次 {{ s.run_date }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ s.run_time }}</td>
+                    <td>
+                        {% if s.recipient_mode == 'all' %}<span class="badge bg-danger">全部人员</span>
+                        {% elif s.recipient_mode == 'ids' %}{{ (s.recipient_ids or [])|length }} 位
+                        {% else %}<span class="badge bg-info">条件过滤</span>{% endif %}
+                    </td>
+                    <td>{{ s.last_run_at.strftime('%Y-%m-%d %H:%M') if s.last_run_at else '—' }}</td>
+                    <td>
+                        <span class="{{ 'status-on' if s.enabled else 'status-off' }}">
+                            {{ '启用' if s.enabled else '停用' }}
+                        </span>
+                    </td>
+                    <td style="white-space:nowrap;">
+                        <a href="{{ url_for('email.schedule_edit', id=s.id) }}" class="btn btn-sm btn-outline-primary py-0 px-2">编辑</a>
+                        <form method="POST" action="{{ url_for('email.schedule_toggle', id=s.id) }}" style="display:inline;">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2">{{ '停用' if s.enabled else '启用' }}</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('email.schedule_run_now', id=s.id) }}" style="display:inline;"
+                              onsubmit="return confirm('立即执行一次「{{ s.name }}」？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-warning py-0 px-2">立即运行</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('email.schedule_delete', id=s.id) }}" style="display:inline;"
+                              onsubmit="return confirm('确认删除任务「{{ s.name }}」？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-danger py-0 px-2">删除</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-3 shadow-sm p-5 text-center text-muted">
+        <div style="font-size:40px;">⏰</div>
+        <div class="mt-2">暂无定时任务</div>
+        <a href="{{ url_for('email.schedule_new') }}" class="btn btn-primary btn-sm mt-3">创建第一个定时任务</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

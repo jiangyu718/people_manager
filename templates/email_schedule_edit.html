@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block title %}{{ '编辑定时任务' if sched else '新建定时任务' }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-label { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .form-control, .form-select { font-size: 13px; }
+    .sched-section {
+        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+        padding: 14px; margin-bottom: 14px;
+    }
+    .recipient-scroll { max-height: 320px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; }
+    .emp-row { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid #f3f4f6; font-size: 12px; }
+    .emp-row:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="content-topbar">
+    <h5>{{ '✏️ 编辑定时任务' if sched else '➕ 新建定时任务' }}</h5>
+    <a href="{{ url_for('email.schedules') }}" class="btn btn-outline-secondary btn-sm">← 返回列表</a>
+</div>
+<div class="content-body">
+    <div class="flash-wrap">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}{% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show py-2" role="alert">
+                    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}{% endif %}
+        {% endwith %}
+    </div>
+
+    <form method="POST" class="bg-white rounded-3 shadow-sm p-4" style="max-width:760px;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="row g-3">
+            <div class="col-sm-6">
+                <label class="form-label">任务名称 <span class="text-danger">*</span></label>
+                <input type="text" name="name" class="form-control" required maxlength="100"
+                       value="{{ sched.name if sched else '' }}">
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label">邮件模板 <span class="text-danger">*</span></label>
+                <select name="template_id" class="form-select" required>
+                    <option value="">请选择...</option>
+                    {% for t in templates %}
+                    <option value="{{ t.id }}" {% if sched and sched.template_id == t.id %}selected{% endif %}>{{ t.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="sched-section mt-3">
+            <label class="form-label">执行周期</label>
+            <div class="d-flex gap-3 mb-2">
+                <label><input type="radio" name="schedule_type" value="daily" onchange="onTypeChange()"
+                              {% if not sched or sched.schedule_type == 'daily' %}checked{% endif %}> 每天</label>
+                <label><input type="radio" name="schedule_type" value="monthly" onchange="onTypeChange()"
+                              {% if sched and sched.schedule_type == 'monthly' %}checked{% endif %}> 每月某天</label>
+                <label><input type="radio" name="schedule_type" value="once" onchange="onTypeChange()"
+                              {% if sched and sched.schedule_type == 'once' %}checked{% endif %}> 指定日期</label>
+            </div>
+            <div class="row g-2">
+                <div class="col-sm-4" id="dom-wrap" style="display:none;">
+                    <label class="form-label" style="font-size:12px;">每月第几日 (1–31)</label>
+                    <input type="number" name="day_of_month" class="form-control" min="1" max="31"
+                           value="{{ sched.day_of_month if sched else '' }}">
+                </div>
+                <div class="col-sm-4" id="date-wrap" style="display:none;">
+                    <label class="form-label" style="font-size:12px;">执行日期</label>
+                    <input type="date" name="run_date" class="form-control"
+                           value="{{ sched.run_date.isoformat() if sched and sched.run_date else '' }}">
+                </div>
+                <div class="col-sm-4">
+                    <label class="form-label" style="font-size:12px;">执行时间 (北京时间)</label>
+                    <input type="time" name="run_time" class="form-control"
+                           value="{{ sched.run_time if sched else '09:00' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="sched-section">
+            <label class="form-label">收件人</label>
+            <div class="d-flex gap-3 mb-2">
+                <label><input type="radio" name="recipient_mode" value="ids" onchange="onModeChange()"
+                              {% if not sched or sched.recipient_mode == 'ids' %}checked{% endif %}> 指定人员</label>
+                <label><input type="radio" name="recipient_mode" value="all" onchange="onModeChange()"
+                              {% if sched and sched.recipient_mode == 'all' %}checked{% endif %}> 全部人员</label>
+                <label><input type="radio" name="recipient_mode" value="filter" onchange="onModeChange()"
+                              {% if sched and sched.recipient_mode == 'filter' %}checked{% endif %}> 按条件筛选</label>
+            </div>
+
+            <div id="mode-ids">
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selAll(true)">全选</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selAll(false)">全清</button>
+                    <span class="text-muted ms-2" style="font-size:12px;" id="sel-info"></span>
+                </div>
+                <div class="recipient-scroll">
+                    {% for e in employees %}
+                    <div class="emp-row">
+                        <input type="checkbox" name="recipient_ids" value="{{ e.employee_id }}" class="r-cb"
+                               {% if sched and sched.recipient_ids and e.employee_id in sched.recipient_ids %}checked{% endif %}>
+                        <span style="min-width:80px; color:#6b7280;">{{ e.employee_id }}</span>
+                        <span style="min-width:90px;">{{ e.name }}</span>
+                        <span style="flex:1; color:#4b5563;">{{ e.email or '（无邮箱）' }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div id="mode-filter" style="display:none;">
+                <div class="row g-2 mb-2">
+                    <div class="col-sm-6">
+                        <label class="form-label" style="font-size:12px;">职级范围（含）</label>
+                        <div class="d-flex gap-2">
+                            <input type="number" name="rank_min" class="form-control" placeholder="最低"
+                                   value="{{ sched.recipient_filter.rank_min if sched and sched.recipient_filter else '' }}">
+                            <input type="number" name="rank_max" class="form-control" placeholder="最高"
+                                   value="{{ sched.recipient_filter.rank_max if sched and sched.recipient_filter else '' }}">
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" style="font-size:12px;">异地状态</label>
+                        <select name="remote_status" class="form-select">
+                            {% set rs = sched.recipient_filter.remote if sched and sched.recipient_filter else 'any' %}
+                            <option value="any" {% if rs == 'any' %}selected{% endif %}>不限</option>
+                            <option value="yes" {% if rs == 'yes' %}selected{% endif %}>异地</option>
+                            <option value="no"  {% if rs == 'no'  %}selected{% endif %}>非异地</option>
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" style="font-size:12px;">异地开始时间 从</label>
+                        <input type="date" name="remote_from" class="form-control"
+                               value="{{ sched.recipient_filter.remote_from if sched and sched.recipient_filter else '' }}">
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" style="font-size:12px;">至</label>
+                        <input type="date" name="remote_to" class="form-control"
+                               value="{{ sched.recipient_filter.remote_to if sched and sched.recipient_filter else '' }}">
+                    </div>
+                </div>
+                <div class="text-muted" style="font-size:12px;">基于"异地情况记录"中 approved 的最新记录筛选员工。</div>
+            </div>
+        </div>
+
+        <div class="form-check mb-3">
+            <input type="checkbox" name="enabled" value="1" class="form-check-input" id="enabled-cb"
+                   {% if not sched or sched.enabled %}checked{% endif %}>
+            <label class="form-check-label" for="enabled-cb">启用此任务</label>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a href="{{ url_for('email.schedules') }}" class="btn btn-outline-secondary">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function onTypeChange() {
+    const t = document.querySelector('input[name="schedule_type"]:checked').value;
+    document.getElementById('dom-wrap').style.display  = t === 'monthly' ? '' : 'none';
+    document.getElementById('date-wrap').style.display = t === 'once' ? '' : 'none';
+}
+function onModeChange() {
+    const m = document.querySelector('input[name="recipient_mode"]:checked').value;
+    document.getElementById('mode-ids').style.display    = m === 'ids' ? '' : 'none';
+    document.getElementById('mode-filter').style.display = m === 'filter' ? '' : 'none';
+}
+function selAll(on) {
+    document.querySelectorAll('.r-cb').forEach(c => { if (!c.disabled) c.checked = on; });
+    updateSelInfo();
+}
+function updateSelInfo() {
+    const n = document.querySelectorAll('.r-cb:checked').length;
+    document.getElementById('sel-info').textContent = n ? `已选 ${n} 位` : '';
+}
+document.querySelectorAll('.r-cb').forEach(c => c.addEventListener('change', updateSelInfo));
+onTypeChange(); onModeChange(); updateSelInfo();
+</script>
+{% endblock %}
