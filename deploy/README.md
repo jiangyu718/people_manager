@@ -15,14 +15,14 @@
 
 ```bash
 # 2.1 部署代码
-sudo mkdir -p /opt/cmss_people
-sudo chown www-data:www-data /opt/cmss_people
-# 把项目拷到 /opt/cmss_people（git clone / rsync / scp 均可）
+sudo mkdir -p /opt/people_manager
+sudo chown root:root /opt/people_manager
+# 把项目拷到 /opt/people_manager（git clone / rsync / scp 均可）
 
 # 2.2 建虚拟环境 & 装依赖
-cd /opt/cmss_people
-sudo -u www-data python3 -m venv .venv
-sudo -u www-data .venv/bin/pip install -r requirements.txt
+cd /opt/people_manager
+sudo python3 -m venv .venv
+sudo .venv/bin/pip install -r requirements.txt
 
 # 2.3 复制 systemd 单元文件
 sudo cp deploy/cmss-people.service /etc/systemd/system/
@@ -56,7 +56,7 @@ sudo journalctl -u cmss-people -n 100
 ## 4. 更新代码后
 
 ```bash
-cd /opt/cmss_people
+cd /opt/people_manager
 git pull                              # 拉最新代码
 .venv/bin/pip install -r requirements.txt   # 依赖若有变化
 sudo systemctl restart cmss-people    # 重启服务

@@ -117,6 +117,7 @@ def export():
         '员工编号': p.employee_id,
         '姓名': p.name,
         '职级': p.rank,
+        '职级调整时间': str(p.rank_date) if p.rank_date else '',
         '工作所在地': p.work_location,
         '工作所在地时间': str(p.work_location_date) if p.work_location_date else '',
         '户口所在地': p.household_location,
@@ -268,6 +269,7 @@ def edit(id):
     form.employee_id.data = p.employee_id
     form.name.data = p.name
     form.rank.data = p.rank
+    form.rank_date.data = p.rank_date
     form.work_province.data = wp
     form.work_city.choices = [('', '请选择市')] + [(c, c) for c in CHINA_CITIES.get(wp, [])]
     form.work_city.data = wc
@@ -308,6 +310,7 @@ def clone(id):
     form.employee_id.data = src.employee_id
     form.name.data = src.name
     form.rank.data = src.rank
+    form.rank_date.data = src.rank_date
     form.work_province.data = wp
     form.work_city.choices = [('', '请选择市')] + [(c, c) for c in CHINA_CITIES.get(wp, [])]
     form.work_city.data = wc
@@ -330,6 +333,7 @@ def clone(id):
         'work_loc': str(src.work_location_date) if src.work_location_date else '',
         'household_loc': str(src.household_location_date) if src.household_location_date else '',
         'spouse_loc': str(src.spouse_location_date) if src.spouse_location_date else '',
+        'rank': str(src.rank_date) if src.rank_date else '',
     }
     return render_template('add.html', form=form,
                            prefill_dates=prefill_dates,
@@ -510,63 +514,13 @@ def history_delete(id):
     if p.status not in ('rejected', 'deleted'):
         flash('只能删除审核未通过或已删除的记录', 'warning')
         return redirect(url_for('personnel.history'))
-    db.session.add(Trash(personnel_id=p.id, data=personnel_snapshot(p)))
     db.session.delete(p)
     db.session.commit()
-    flash('记录已移至垃圾桶', 'success')
+    flash('记录已删除', 'success')
     return redirect(url_for('personnel.history'))
 
 
-# ── 垃圾桶 ─────────────────────────────────────────────────
 
-@personnel_bp.route('/trash')
-def trash():
-    trashes = Trash.query.order_by(Trash.deleted_at.desc()).all()
-    return render_template('trash.html', trashes=trashes)
-
-
-@personnel_bp.route('/trash/restore/<int:id>', methods=['POST'])
-def trash_restore(id):
-    t = Trash.query.get_or_404(id)
-    d = t.data
-    pd_date = datetime.fromisoformat(d['property_delivery_date']).date() if d.get('property_delivery_date') else None
-
-    def _iso(k):
-        return datetime.fromisoformat(d[k]).date() if d.get(k) else None
-
-    p = Personnel(
-        personnel_type=d['personnel_type'],
-        employee_id=d['employee_id'],
-        name=d['name'],
-        rank=int(d['rank']) if d.get('rank') not in (None, '') else None,
-        work_location=d['work_location'],
-        household_location=d['household_location'],
-        spouse_location=d.get('spouse_location'),
-        children_location=d.get('children_location'),
-        has_property=d['has_property'],
-        property_delivery_date=pd_date,
-        transition_end_date=calc_transition_end(pd_date),
-        remote_start_date=_iso('remote_start_date'),
-        remote_end_date=_iso('remote_end_date'),
-        work_location_date=_iso('work_location_date'),
-        household_location_date=_iso('household_location_date'),
-        spouse_location_date=_iso('spouse_location_date'),
-        status='approved',
-    )
-    db.session.add(p)
-    db.session.delete(t)
-    db.session.commit()
-    flash('记录已恢复到异地情况记录', 'success')
-    return redirect(url_for('personnel.trash'))
-
-
-@personnel_bp.route('/trash/delete/<int:id>', methods=['POST'])
-def trash_delete(id):
-    t = Trash.query.get_or_404(id)
-    db.session.delete(t)
-    db.session.commit()
-    flash('记录已永久删除', 'success')
-    return redirect(url_for('personnel.trash'))
 
 
 # ── 导入 ───────────────────────────────────────────────────
@@ -636,6 +590,7 @@ def import_upload():
                     employee_id=_str(row, '员工编号') or '',
                     name=_str(row, '姓名'),
                     rank=_rank(row, '职级'),
+                    rank_date=_d(row, '职级调整时间'),
                     work_location=_str(row, '工作所在地'),
                     household_location=_str(row, '户口所在地'),
                     spouse_location=_str(row, '配偶常住地'),
@@ -658,6 +613,8 @@ def import_upload():
                     personnel_id=p.id, history_type='insert',
                     data=personnel_snapshot(p),
                 ))
+                # 确保员工存在于员工管理列表中
+                ensure_employee(p.employee_id, p.name)
                 db.session.commit()
                 imported += 1
 

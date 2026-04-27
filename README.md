@@ -33,10 +33,10 @@ pip install -r requirements.txt
 python main.py
 
 # 生产部署（Linux/macOS）
-gunicorn main:app -b 0.0.0.0:5000
+gunicorn main:app -b 0.0.0.0:5495
 ```
 
-服务默认监听 `http://0.0.0.0:5000`。
+服务默认监听 `http://0.0.0.0:5495`。
 
 **环境变量**（可选，不配置则使用默认值）：
 

@@ -42,7 +42,7 @@
         font-size: 12px; padding: 6px 12px; line-height: 1.4;
     }
     .table-responsive { min-height: 420px; overflow-y: visible; }
-    /* 各列固定宽度；备注列(21)不设 width，动态占剩余空间 */
+    /* 各列固定宽度；备注列(22)不设 width，动态占剩余空间 */
     #personnel-table th:nth-child(1)  { width: 32px; }
     #personnel-table th:nth-child(2)  { width: 100px; }
     #personnel-table th:nth-child(3)  { width: 85px; }
@@ -66,6 +66,7 @@
     #personnel-table th:nth-child(21) { min-width: 60px; }
     #personnel-table th:nth-child(22) { width: 140px; }
     #personnel-table th:nth-child(23) { width: 75px; }
+    #personnel-table th:nth-child(24) { width: 95px; }
     /* 操作列：固定宽度，不受列宽持久化影响 */
     #personnel-table th.col-actions,
     #personnel-table td.col-actions {
@@ -163,23 +164,24 @@
                     <th><div class="th-inner">员工编号<button class="filter-btn" data-col="2" data-type="list">▼</button></div></th>
                     <th><div class="th-inner">姓名<button class="filter-btn" data-col="3" data-type="list">▼</button></div></th>
                     <th><div class="th-inner">职级<button class="filter-btn" data-col="4" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">工作所在地<button class="filter-btn" data-col="5" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">工作所在地时间<button class="filter-btn" data-col="6" data-type="date">▼</button></div></th>
-                    <th><div class="th-inner">户口所在地<button class="filter-btn" data-col="7" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">户口所在地时间<button class="filter-btn" data-col="8" data-type="date">▼</button></div></th>
-                    <th><div class="th-inner">配偶常住地<button class="filter-btn" data-col="9" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">配偶常住地时间<button class="filter-btn" data-col="10" data-type="date">▼</button></div></th>
-                    <th><div class="th-inner">子女常住地<button class="filter-btn" data-col="11" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">是否在工作地购置房产<button class="filter-btn" data-col="12" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">房产交付日期<button class="filter-btn" data-col="13" data-type="date">▼</button></div></th>
-                    <th><div class="th-inner">是否全部售出<button class="filter-btn" data-col="14" data-type="list">▼</button></div></th>
-                    <th><div class="th-inner">过渡期截止<button class="filter-btn" data-col="15" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">职级调整时间<button class="filter-btn" data-col="5" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">工作所在地<button class="filter-btn" data-col="6" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">工作所在地时间<button class="filter-btn" data-col="7" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">户口所在地<button class="filter-btn" data-col="8" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">户口所在地时间<button class="filter-btn" data-col="9" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">配偶常住地<button class="filter-btn" data-col="10" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">配偶常住地时间<button class="filter-btn" data-col="11" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">子女常住地<button class="filter-btn" data-col="12" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">是否在工作地购置房产<button class="filter-btn" data-col="13" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">房产交付日期<button class="filter-btn" data-col="14" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">是否全部售出<button class="filter-btn" data-col="15" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">过渡期截止<button class="filter-btn" data-col="16" data-type="date">▼</button></div></th>
                     <th>附件</th>
-                    <th><div class="th-inner">异地开始时间<button class="filter-btn" data-col="17" data-type="date">▼</button></div></th>
-                    <th><div class="th-inner">异地结束时间<button class="filter-btn" data-col="18" data-type="date">▼</button></div></th>
-                    <th><div class="th-inner">是否符合异地条件<button class="filter-btn" data-col="19" data-type="list">▼</button></div></th>
+                    <th><div class="th-inner">异地开始时间<button class="filter-btn" data-col="18" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">异地结束时间<button class="filter-btn" data-col="19" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">是否符合异地条件<button class="filter-btn" data-col="20" data-type="list">▼</button></div></th>
                     <th>备注</th>
-                    <th><div class="th-inner">创建时间<button class="filter-btn" data-col="21" data-type="date">▼</button></div></th>
+                    <th><div class="th-inner">创建时间<button class="filter-btn" data-col="22" data-type="date">▼</button></div></th>
                     <th class="col-actions">操作</th>
                 </tr>
             </thead>
@@ -193,6 +195,7 @@
                     <td class="dbl-copy">{{ p.employee_id }}</td>
                     <td class="dbl-copy">{{ p.name }}</td>
                     <td class="dbl-copy">{{ p.rank if p.rank is not none else '-' }}</td>
+                    <td class="dbl-copy">{{ p.rank_date or '-' }}</td>
                     <td class="dbl-copy">{{ p.work_location }}</td>
                     <td class="dbl-copy">{{ p.work_location_date or '-' }}</td>
                     <td class="dbl-copy">{{ p.household_location }}</td>

@@ -187,10 +187,6 @@
                class="nav-link-item {% if request.endpoint == 'personnel.history' %}active{% endif %}">
                 <span class="ni">📝</span>历史记录
             </a>
-            <a href="{{ url_for('personnel.trash') }}"
-               class="nav-link-item {% if request.endpoint == 'personnel.trash' %}active{% endif %}">
-                <span class="ni">🗑️</span>垃圾桶
-            </a>
         </div>
 
         {% if current_user %}
