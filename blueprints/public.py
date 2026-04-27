@@ -5,7 +5,7 @@ import uuid
 from flask import Blueprint, render_template, request, redirect, url_for, send_file
 from flask import flash
 
-from models import db, Personnel, Trash, FormToken, Attachment
+from models import db, Personnel, FormToken, Attachment
 from forms import PersonnelForm
 from services.form_helpers import inject_city_choices, flash_form_errors
 from services.location import compose_location
@@ -91,9 +91,8 @@ def index():
     history_count = Personnel.query.filter(
         Personnel.status.in_(['rejected', 'deleted'])
     ).count()
-    trash_count = Trash.query.count()
     return render_template('index.html', total=total, pending=pending,
-                           history_count=history_count, trash_count=trash_count)
+                           history_count=history_count)
 
 
 @public_bp.route('/file/<int:file_id>')

@@ -7,7 +7,7 @@ import zipfile
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify
 import pandas as pd
 
-from models import db, Personnel, PersonnelHistory, Trash, Attachment, beijing_now
+from models import db, Personnel, PersonnelHistory, Attachment, beijing_now
 from forms import PersonnelForm
 from utils import CHINA_CITIES
 from services.location import compose_location, split_location

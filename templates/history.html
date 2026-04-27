@@ -21,7 +21,7 @@
 {% block content %}
 <div class="content-topbar">
     <h5>📋 历史记录</h5>
-    <span class="text-muted ms-1" style="font-size:13px;">所有进入系统的记录汇总。审核未通过或已删除的记录可恢复或移入垃圾桶。</span>
+    <span class="text-muted ms-1" style="font-size:13px;">所有进入系统的记录汇总。审核未通过或已删除的记录可恢复或删除。</span>
 </div>
 <div class="content-body">
 
@@ -94,13 +94,6 @@
                     <td>{{ p.remote_end_date or '-' }}</td>
                     <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M:%S') if p.created_at else '-' }}</td>
                     <td>
-                        {% if p.is_no_change %}
-                            <span class="status-badge" style="background:#e0e7ff; color:#3730a3;">无修改确认</span>
-                        {% else %}
-                            <span class="text-muted">—</span>
-                        {% endif %}
-                    </td>
-                    <td>
                         {% if p.status in ('rejected', 'deleted') %}
                         <form method="POST" action="{{ url_for('personnel.history_restore', id=p.id) }}" style="display:inline;"
                               onsubmit="return confirm('确认恢复该记录到异地情况记录？');">
@@ -108,7 +101,7 @@
                             <button type="submit" class="btn btn-sm btn-success py-0 px-2">恢复</button>
                         </form>
                         <form method="POST" action="{{ url_for('personnel.history_delete', id=p.id) }}" style="display:inline;"
-                              onsubmit="return confirm('确认移入垃圾桶？');">
+                              onsubmit="return confirm('确认删除？');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-sm btn-danger py-0 px-2">删除</button>
                         </form>
